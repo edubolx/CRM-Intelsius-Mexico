@@ -1219,7 +1219,7 @@ function AppInner(){
         <header style={{background:"#ffffff",borderBottom:"1px solid #b8d8eb",padding:"13px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
           <div>
             <div style={{display:"flex",alignItems:"center",gap:9}}>
-              <div style={{width:30,height:30,background:"linear-gradient(135deg,#003e7e,#27aae1)",borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#fff"}}>◆</div>
+              <img src="/intelsius-logo.jpg" alt="Intelsius" style={{height:30,width:"auto",borderRadius:4,objectFit:"contain",background:"#fff"}} />
               <span style={{fontSize:19,fontFamily:"'DM Sans',Arial,sans-serif",color:"#1a2a3a"}}>{t.appName}</span>
               <SaveIndicator status={saveStatus}/>
             </div>
