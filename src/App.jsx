@@ -50,6 +50,7 @@ const T = {
     overdue:"Vencidas",
     dueSoon:"Por vencer (7 días)",
     completedWeek:"Completadas semana",
+    all:"Todas",
     companyName:"Nombre de empresa", industry:"Industria", website:"Sitio web",
     phone:"Teléfono", notes:"Notas", name:"Nombre", email:"Email",
     titleF:"Cargo / Título", linkedin:"LinkedIn", company:"Empresa",
@@ -129,6 +130,7 @@ const T = {
     overdue:"Overdue",
     dueSoon:"Due in 7 days",
     completedWeek:"Completed this week",
+    all:"All",
     companyName:"Company name", industry:"Industry", website:"Website",
     phone:"Phone", notes:"Notes", name:"Name", email:"Email",
     titleF:"Title / Role", linkedin:"LinkedIn", company:"Company",
@@ -1108,7 +1110,8 @@ function ActivitiesPanel({deal,t,onAddActivity,onDeleteActivity,onUpdateActivity
   );
 }
 
-function ActivitiesDashboard({dls,t}){
+function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
+  const [filter, setFilter] = useState("all");
   const all = dls.flatMap(d => (d.activities||[]).map(a=>({...a,dealId:d.id,dealName:d.name})));
   const now = new Date();
   const todayS = today();
@@ -1119,41 +1122,59 @@ function ActivitiesDashboard({dls,t}){
   const overdue = pending.filter(a=>a.dueDate && a.dueDate < todayS);
   const dueSoon = pending.filter(a=>a.dueDate && a.dueDate >= todayS && a.dueDate <= new Date(now.getTime()+7*86400000).toISOString().slice(0,10));
   const completedWeek = all.filter(a=>a.status==="done" && a.dueDate && new Date(a.dueDate)>=weekStart && new Date(a.dueDate)<weekEnd);
-  const blocked = all.filter(a=>a.status==="blocked");
+
+  const lists = { all, pending, overdue, dueSoon, completedWeek };
+  const rows = lists[filter] || all;
+  const statusOpts = ACTIVITY_STATUSES.map(v=>({v,l:t[v]}));
+
+  const cards = [
+    {k:"pending",l:t.pending,v:pending.length,c:"#27aae1"},
+    {k:"overdue",l:t.overdue,v:overdue.length,c:"#ef4444"},
+    {k:"dueSoon",l:t.dueSoon,v:dueSoon.length,c:"#f59e0b"},
+    {k:"completedWeek",l:t.completedWeek,v:completedWeek.length,c:"#22c55e"},
+  ];
 
   return (
     <div>
+      <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+        <button onClick={()=>setFilter("all")} style={{background:filter==="all"?"#003e7e":"#ffffff",color:filter==="all"?"#fff":"#4a5a6a",border:"1px solid #b8d8eb",borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{t.all} ({all.length})</button>
+        {cards.map(s=>(
+          <button key={s.k} onClick={()=>setFilter(s.k)} style={{background:filter===s.k?s.c+"22":"#ffffff",color:filter===s.k?s.c:"#4a5a6a",border:`1px solid ${filter===s.k?s.c:"#b8d8eb"}`,borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>
+            {s.l} ({s.v})
+          </button>
+        ))}
+      </div>
+
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
-        {[{l:t.pending,v:pending.length,c:"#27aae1"},{l:t.overdue,v:overdue.length,c:"#ef4444"},{l:t.dueSoon,v:dueSoon.length,c:"#f59e0b"},{l:t.completedWeek,v:completedWeek.length,c:"#22c55e"}].map(s=>(
-          <div key={s.l} style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:"10px 16px",flex:1,minWidth:130}}>
+        {cards.map(s=>(
+          <div key={s.k} style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:"10px 16px",flex:1,minWidth:130}}>
             <div style={{fontSize:10,color:"#6b7d8e",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
             <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'DM Sans',Arial,sans-serif"}}>{s.v}</div>
           </div>
         ))}
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:10}}>
-        <div style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:12}}>
-          <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:"#4a5a6a",marginBottom:8}}>{t.activities} · Top pendientes</div>
-          {pending.slice(0,10).map(a=>(
-            <div key={a.id} style={{padding:"6px 0",borderBottom:"1px solid #f0f4f8"}}>
-              <div style={{fontSize:12,color:"#1a2a3a"}}>{a.title}</div>
-              <div style={{fontSize:10,color:"#6b7d8e"}}>{a.dealName} {a.dueDate?`· ${a.dueDate}`:""}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {rows.map(a=>(
+          <div key={a.id} onClick={()=>onOpenActivity(a.dealId)} style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:10,padding:"10px 12px",cursor:"pointer"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+                <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
+                <span style={{fontSize:12,fontWeight:600,color:"#1a2a3a"}}>{a.title}</span>
+                <span style={{fontSize:10,color:"#003e7e",fontFamily:"'JetBrains Mono',monospace",background:"#eaf3ff",border:"1px solid #b8d8eb",borderRadius:5,padding:"2px 6px"}}>Deal: {a.dealName}</span>
+              </div>
+              <select value={a.status} onClick={e=>e.stopPropagation()} onChange={e=>onUpdateActivityStatus(a.dealId,a.id,e.target.value)} style={{...iSx,padding:"3px 6px",fontSize:11,width:140}}>
+                {statusOpts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+              </select>
             </div>
-          ))}
-          {!pending.length && <div style={{fontSize:11,color:"#8ea4b8"}}>{t.noActivities}</div>}
-        </div>
-
-        <div style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:12}}>
-          <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:"#4a5a6a",marginBottom:8}}>{t.blocked}</div>
-          {blocked.map(a=>(
-            <div key={a.id} style={{padding:"6px 0",borderBottom:"1px solid #f0f4f8"}}>
-              <div style={{fontSize:12,color:"#1a2a3a"}}>{a.title}</div>
-              <div style={{fontSize:10,color:"#6b7d8e"}}>{a.dealName}</div>
+            <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
+              {a.dueDate && <span style={{fontSize:10,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>📅 {a.dueDate}</span>}
+              {a.responsible && <span style={{fontSize:10,color:"#5a6b7a"}}>👤 {a.responsible}</span>}
             </div>
-          ))}
-          {!blocked.length && <div style={{fontSize:11,color:"#8ea4b8"}}>Sin bloqueadas.</div>}
-        </div>
+            {a.comment && <div style={{fontSize:11,color:"#6b7d8e",marginTop:4,lineHeight:1.5}}>{a.comment}</div>}
+          </div>
+        ))}
+        {!rows.length && <div style={{fontSize:11,color:"#8ea4b8"}}>{t.noActivities}</div>}
       </div>
     </div>
   );
@@ -1161,7 +1182,7 @@ function ActivitiesDashboard({dls,t}){
 
 // ─── Deal Detail Modal ────────────────────────────────────────────────────────
 function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval, onDeleteEval, onAddActivity, onDeleteActivity, onUpdateActivityStatus, onEditDeal, onClose}){
-  const [tab, setTab] = useState("meddic");
+  const [tab, setTab] = useState(deal._openTab || "meddic");
   const co = cos.find(c=>c.id===deal.companyId);
   const ct = cts.find(c=>c.id===deal.contactId);
   const m  = stageStyle(stages, deal.stage);
@@ -1460,6 +1481,12 @@ function AppInner(){
     setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?{...a,status}:a)}:p);
   };
 
+  const openDealActivities=(dealId)=>{
+    const d = dls.find(x=>x.id===dealId);
+    if(!d) return;
+    setViewDeal({...d, _openTab:"activities"});
+  };
+
   const importCos=rows=>setCos(p=>{const ex=new Set(p.map(c=>c.name.toLowerCase()));return[...p,...rows.filter(r=>!ex.has(r.name.toLowerCase()))];});
   const importCts=rows=>setCts(p=>{const ex=new Set(p.map(c=>c.email?.toLowerCase()).filter(Boolean));return[...p,...rows.filter(r=>!r.email||!ex.has(r.email.toLowerCase()))];});
 
@@ -1570,7 +1597,7 @@ function AppInner(){
             </div>
           )}
           {tab==="activities"&&(
-            <ActivitiesDashboard dls={dls} t={t}/>
+            <ActivitiesDashboard dls={dls} t={t} onUpdateActivityStatus={updateActivityStatus} onOpenActivity={openDealActivities}/>
           )}
         </main>
       </div>
