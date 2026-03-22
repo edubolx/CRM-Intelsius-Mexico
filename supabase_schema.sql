@@ -89,3 +89,26 @@ create index if not exists idx_deals_contact       on deals(contact_id);
 create index if not exists idx_deals_stage         on deals(stage);
 create index if not exists idx_meddic_deal         on meddic_evals(deal_id);
 create index if not exists idx_stages_position     on pipeline_stages(position);
+
+-- 6. Deal activities / tasks
+create table if not exists deal_activities (
+  id          text primary key default gen_random_uuid()::text,
+  deal_id     text not null references deals(id) on delete cascade,
+  type        text not null default 'task',
+  title       text not null,
+  due_date    date,
+  responsible text,
+  status      text not null default 'pending',
+  comment     text,
+  created_at  timestamptz default now()
+);
+
+alter table deal_activities enable row level security;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='deal_activities' and policyname='allow_all_deal_activities') then
+    create policy "allow_all_deal_activities" on deal_activities for all using (true) with check (true);
+  end if;
+end $$;
+
+create index if not exists idx_deal_activities_deal on deal_activities(deal_id);
+create index if not exists idx_deal_activities_due  on deal_activities(due_date);

@@ -28,6 +28,28 @@ const T = {
     meddicDeleteConfirm:"¿Seguro que quieres eliminar esta evaluación?",
     viewDeal:"Ver deal",
     closeDeal:"Cerrar",
+    activities:"Actividades",
+    activityType:"Tipo",
+    activityTitle:"Título",
+    activityDueDate:"Fecha compromiso",
+    activityResponsible:"Responsable",
+    activityStatus:"Estado",
+    activityComment:"Comentario",
+    addActivity:"Nueva actividad",
+    noActivities:"Sin actividades todavía.",
+    pending:"Pendiente",
+    inProgress:"En progreso",
+    done:"Hecha",
+    blocked:"Bloqueada",
+    call:"Llamada",
+    meeting:"Reunión",
+    task:"Tarea",
+    note:"Nota",
+    emailType:"Email",
+    dashboard:"Dashboard",
+    overdue:"Vencidas",
+    dueSoon:"Por vencer (7 días)",
+    completedWeek:"Completadas semana",
     companyName:"Nombre de empresa", industry:"Industria", website:"Sitio web",
     phone:"Teléfono", notes:"Notas", name:"Nombre", email:"Email",
     titleF:"Cargo / Título", linkedin:"LinkedIn", company:"Empresa",
@@ -85,6 +107,28 @@ const T = {
     meddicDeleteConfirm:"Are you sure you want to delete this evaluation?",
     viewDeal:"View deal",
     closeDeal:"Close",
+    activities:"Activities",
+    activityType:"Type",
+    activityTitle:"Title",
+    activityDueDate:"Due date",
+    activityResponsible:"Owner",
+    activityStatus:"Status",
+    activityComment:"Comment",
+    addActivity:"New activity",
+    noActivities:"No activities yet.",
+    pending:"Pending",
+    inProgress:"In progress",
+    done:"Done",
+    blocked:"Blocked",
+    call:"Call",
+    meeting:"Meeting",
+    task:"Task",
+    note:"Note",
+    emailType:"Email",
+    dashboard:"Dashboard",
+    overdue:"Overdue",
+    dueSoon:"Due in 7 days",
+    completedWeek:"Completed this week",
     companyName:"Company name", industry:"Industry", website:"Website",
     phone:"Phone", notes:"Notes", name:"Name", email:"Email",
     titleF:"Title / Role", linkedin:"LinkedIn", company:"Company",
@@ -235,7 +279,16 @@ const fv = (n, currencyCode) => {
 };
 
 const today=()=>new Date().toISOString().slice(0,10);
-
+const startOfWeek = (d=new Date()) => {
+  const x = new Date(d);
+  const day = x.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate()+diff);
+  x.setHours(0,0,0,0);
+  return x;
+};
+const ACTIVITY_TYPES = ["call","emailType","meeting","task","note"];
+const ACTIVITY_STATUSES = ["pending","inProgress","done","blocked"];
 
 // ─── Storage helpers (Supabase with localStorage fallback) ────────────────────
 const STORAGE_KEY = "crm5_data";
@@ -253,6 +306,12 @@ async function supabaseLoad() {
       supabase.from('pipeline_stages').select('*').order('position'),
     ]);
 
+    let activities = [];
+    try {
+      const { data } = await supabase.from('deal_activities').select('*').order('due_date');
+      activities = data || [];
+    } catch {}
+
     // Attach meddicHistory to each deal
     const dls = (dls_raw || []).map(d => ({
       ...d,
@@ -260,6 +319,18 @@ async function supabaseLoad() {
       meddicHistory: (evals || [])
         .filter(e => e.deal_id === d.id)
         .map(e => ({ id: e.id, date: e.date, meddic: e.meddic })),
+      activities: (activities || [])
+        .filter(a => a.deal_id === d.id)
+        .map(a => ({
+          id: a.id,
+          type: a.type,
+          title: a.title,
+          dueDate: a.due_date,
+          responsible: a.responsible,
+          status: a.status,
+          comment: a.comment || "",
+          createdAt: a.created_at,
+        })),
     }));
 
     const stages = stages_raw && stages_raw.length > 0
@@ -314,6 +385,33 @@ async function supabaseSaveAll({ cos, cts, dls, stages }) {
       if (staleIds.length > 0) {
         await supabase.from('meddic_evals').delete().in('id', staleIds);
       }
+
+      // Upsert + sync deletes for deal activities (if table exists)
+      try {
+        const allActivities = dls.flatMap(d =>
+          (d.activities || []).map(a => ({
+            id: a.id,
+            deal_id: d.id,
+            type: a.type,
+            title: a.title,
+            due_date: a.dueDate || null,
+            responsible: a.responsible || "",
+            status: a.status || "pending",
+            comment: a.comment || "",
+          }))
+        );
+        if (allActivities.length > 0) {
+          await supabase.from('deal_activities').upsert(allActivities, { onConflict: 'id' });
+        }
+        const { data: existingActivities } = await supabase.from('deal_activities').select('id,deal_id');
+        const validActivityIds = new Set(allActivities.map(a=>a.id));
+        const staleActivityIds = (existingActivities || [])
+          .filter(a => validDealIds.has(a.deal_id) && !validActivityIds.has(a.id))
+          .map(a => a.id);
+        if (staleActivityIds.length > 0) {
+          await supabase.from('deal_activities').delete().in('id', staleActivityIds);
+        }
+      } catch {}
     }
     // Upsert stages
     if (stages.length > 0) {
@@ -946,8 +1044,123 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
   );
 }
 
+function ActivitiesPanel({deal,t,onAddActivity,onDeleteActivity,onUpdateActivityStatus}){
+  const [form, setForm] = useState({
+    type:"task",
+    title:"",
+    dueDate:today(),
+    responsible:"",
+    status:"pending",
+    comment:"",
+  });
+  const setF = (k,v) => setForm(p=>({...p,[k]:v}));
+
+  const typeOpts = ACTIVITY_TYPES.map(v=>({v,l:t[v]}));
+  const statusOpts = ACTIVITY_STATUSES.map(v=>({v,l:t[v]}));
+
+  const handleAdd = () => {
+    if(!form.title?.trim()) return;
+    onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: new Date().toISOString() });
+    setForm(p=>({...p,title:"",comment:"",status:"pending"}));
+  };
+
+  return (
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:8,marginBottom:10}}>
+        <Sel label={t.activityType} value={form.type} onChange={e=>setF("type",e.target.value)} opts={typeOpts}/>
+        <Inp label={t.activityTitle+" *"} value={form.title} onChange={e=>setF("title",e.target.value)} />
+        <Inp label={t.activityDueDate} type="date" value={form.dueDate} onChange={e=>setF("dueDate",e.target.value)} />
+        <Inp label={t.activityResponsible} value={form.responsible} onChange={e=>setF("responsible",e.target.value)} />
+        <Sel label={t.activityStatus} value={form.status} onChange={e=>setF("status",e.target.value)} opts={statusOpts}/>
+      </div>
+      <Txta label={t.activityComment} value={form.comment} onChange={e=>setF("comment",e.target.value)} />
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+        <Btn ch={<><Ic n="plus" s={12}/>{t.addActivity}</>} onClick={handleAdd}/>
+      </div>
+
+      <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
+        {(!(deal.activities||[]).length) && (
+          <div style={{fontSize:11,color:"#8ea4b8",fontFamily:"'JetBrains Mono',monospace"}}>{t.noActivities}</div>
+        )}
+        {[...(deal.activities||[])].sort((a,b)=>(a.dueDate||"").localeCompare(b.dueDate||"")).map(a=>(
+          <div key={a.id} style={{background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:10,padding:"9px 10px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+                <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
+                <span style={{fontSize:12,fontWeight:600,color:"#1a2a3a"}}>{a.title}</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <select value={a.status} onChange={e=>onUpdateActivityStatus(a.id,e.target.value)} style={{...iSx,padding:"3px 6px",fontSize:11,width:120}}>
+                  {statusOpts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
+                <button title={t.deleteBtn} onClick={()=>onDeleteActivity(a.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:2}}><Ic n="trash" s={12}/></button>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
+              {a.dueDate && <span style={{fontSize:10,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>📅 {a.dueDate}</span>}
+              {a.responsible && <span style={{fontSize:10,color:"#5a6b7a"}}>👤 {a.responsible}</span>}
+            </div>
+            {a.comment && <div style={{fontSize:11,color:"#6b7d8e",marginTop:4,lineHeight:1.5}}>{a.comment}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActivitiesDashboard({dls,t}){
+  const all = dls.flatMap(d => (d.activities||[]).map(a=>({...a,dealId:d.id,dealName:d.name})));
+  const now = new Date();
+  const todayS = today();
+  const weekStart = startOfWeek(now);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate()+7);
+
+  const pending = all.filter(a=>a.status!=="done");
+  const overdue = pending.filter(a=>a.dueDate && a.dueDate < todayS);
+  const dueSoon = pending.filter(a=>a.dueDate && a.dueDate >= todayS && a.dueDate <= new Date(now.getTime()+7*86400000).toISOString().slice(0,10));
+  const completedWeek = all.filter(a=>a.status==="done" && a.dueDate && new Date(a.dueDate)>=weekStart && new Date(a.dueDate)<weekEnd);
+  const blocked = all.filter(a=>a.status==="blocked");
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        {[{l:t.pending,v:pending.length,c:"#27aae1"},{l:t.overdue,v:overdue.length,c:"#ef4444"},{l:t.dueSoon,v:dueSoon.length,c:"#f59e0b"},{l:t.completedWeek,v:completedWeek.length,c:"#22c55e"}].map(s=>(
+          <div key={s.l} style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:"10px 16px",flex:1,minWidth:130}}>
+            <div style={{fontSize:10,color:"#6b7d8e",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
+            <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'DM Sans',Arial,sans-serif"}}>{s.v}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:10}}>
+        <div style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:12}}>
+          <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:"#4a5a6a",marginBottom:8}}>{t.activities} · Top pendientes</div>
+          {pending.slice(0,10).map(a=>(
+            <div key={a.id} style={{padding:"6px 0",borderBottom:"1px solid #f0f4f8"}}>
+              <div style={{fontSize:12,color:"#1a2a3a"}}>{a.title}</div>
+              <div style={{fontSize:10,color:"#6b7d8e"}}>{a.dealName} {a.dueDate?`· ${a.dueDate}`:""}</div>
+            </div>
+          ))}
+          {!pending.length && <div style={{fontSize:11,color:"#8ea4b8"}}>{t.noActivities}</div>}
+        </div>
+
+        <div style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:12}}>
+          <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:"#4a5a6a",marginBottom:8}}>{t.blocked}</div>
+          {blocked.map(a=>(
+            <div key={a.id} style={{padding:"6px 0",borderBottom:"1px solid #f0f4f8"}}>
+              <div style={{fontSize:12,color:"#1a2a3a"}}>{a.title}</div>
+              <div style={{fontSize:10,color:"#6b7d8e"}}>{a.dealName}</div>
+            </div>
+          ))}
+          {!blocked.length && <div style={{fontSize:11,color:"#8ea4b8"}}>Sin bloqueadas.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Deal Detail Modal ────────────────────────────────────────────────────────
-function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval, onDeleteEval, onEditDeal, onClose}){
+function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval, onDeleteEval, onAddActivity, onDeleteActivity, onUpdateActivityStatus, onEditDeal, onClose}){
   const [tab, setTab] = useState("meddic");
   const co = cos.find(c=>c.id===deal.companyId);
   const ct = cts.find(c=>c.id===deal.contactId);
@@ -973,7 +1186,7 @@ function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval,
       </div>
 
       <div style={{display:"flex",gap:2,marginBottom:18,borderBottom:"1px solid #c8d6e4"}}>
-        {[{k:"meddic",l:"MEDDIC",icon:"meddic"},{k:"notes",l:t.notes,icon:"edit"}].map(tb=>(
+        {[{k:"meddic",l:"MEDDIC",icon:"meddic"},{k:"notes",l:t.notes,icon:"edit"},{k:"activities",l:t.activities,icon:"history"}].map(tb=>(
           <button key={tb.k} onClick={()=>setTab(tb.k)}
             style={{background:"none",border:"none",borderBottom:`2px solid ${tab===tb.k?"#003e7e":"transparent"}`,padding:"8px 14px",color:tab===tb.k?"#27aae1":"#6b7d8e",fontFamily:"inherit",fontSize:12,fontWeight:tab===tb.k?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
             <Ic n={tb.icon} s={12}/>{tb.l}
@@ -991,6 +1204,15 @@ function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval,
         <div style={{fontSize:13,color:"#5a6b7a",lineHeight:1.7,whiteSpace:"pre-wrap"}}>
           {deal.notes || <span style={{color:"#8ea4b8",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>Sin notas.</span>}
         </div>
+      )}
+      {tab==="activities" && (
+        <ActivitiesPanel
+          deal={deal}
+          t={t}
+          onAddActivity={onAddActivity}
+          onDeleteActivity={onDeleteActivity}
+          onUpdateActivityStatus={onUpdateActivityStatus}
+        />
       )}
     </Modal>
   );
@@ -1133,7 +1355,7 @@ function AppInner(){
   const saveCo=f=>{f.id?setCos(p=>p.map(c=>c.id===f.id?f:c)):setCos(p=>[...p,{...f,id:uid()}]);setModal(null);};
   const saveCt=f=>{f.id?setCts(p=>p.map(c=>c.id===f.id?f:c)):setCts(p=>[...p,{...f,id:uid()}]);setModal(null);};
   const saveDl=f=>{
-    const base={meddicHistory:[]};
+    const base={meddicHistory:[],activities:[]};
     if(f.id){setDls(p=>p.map(d=>d.id===f.id?{...d,...f}:d));}
     else{setDls(p=>[...p,{...base,...f,id:uid()}]);}
     setModal(null);
@@ -1225,6 +1447,19 @@ function AppInner(){
     });
   };
 
+  const addActivity=(dealId, activity)=>{
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]),activity]}:d));
+    setViewDeal(p=>p&&p.id===dealId?{...p,activities:[...(p.activities||[]),activity]}:p);
+  };
+  const deleteActivity=(dealId, activityId)=>{
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).filter(a=>a.id!==activityId)}:d));
+    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).filter(a=>a.id!==activityId)}:p);
+  };
+  const updateActivityStatus=(dealId, activityId, status)=>{
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?{...a,status}:a)}:d));
+    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?{...a,status}:a)}:p);
+  };
+
   const importCos=rows=>setCos(p=>{const ex=new Set(p.map(c=>c.name.toLowerCase()));return[...p,...rows.filter(r=>!ex.has(r.name.toLowerCase()))];});
   const importCts=rows=>setCts(p=>{const ex=new Set(p.map(c=>c.email?.toLowerCase()).filter(Boolean));return[...p,...rows.filter(r=>!r.email||!ex.has(r.email.toLowerCase()))];});
 
@@ -1234,7 +1469,7 @@ function AppInner(){
   const fCt=useMemo(()=>cts.filter(c=>c.name.toLowerCase().includes(ql)||c.email?.toLowerCase().includes(ql)),[cts,ql]);
   const fDl=useMemo(()=>dls.filter(d=>d.name.toLowerCase().includes(ql)),[dls,ql]);
 
-  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"}];
+  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"activities",l:t.activities,i:"history"}];
   const addL=tab==="deals"?t.newDeal:tab==="companies"?t.newCompany:t.newContact;
   const addT=tab==="deals"?"deal":tab==="companies"?"company":"contact";
 
@@ -1334,6 +1569,9 @@ function AppInner(){
               {fCt.length===0&&<div style={{color:"#c8d6e4",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noContacts}</div>}
             </div>
           )}
+          {tab==="activities"&&(
+            <ActivitiesDashboard dls={dls} t={t}/>
+          )}
         </main>
       </div>
 
@@ -1344,6 +1582,9 @@ function AppInner(){
           cos={cos} cts={cts} lang={lang} currency={currency} stages={stages} t={t}
           onSaveEval={ev=>saveEval(viewDeal.id,ev)}
           onDeleteEval={evalId=>deleteEval(viewDeal.id,evalId)}
+          onAddActivity={activity=>addActivity(viewDeal.id,activity)}
+          onDeleteActivity={activityId=>deleteActivity(viewDeal.id,activityId)}
+          onUpdateActivityStatus={(activityId,status)=>updateActivityStatus(viewDeal.id,activityId,status)}
           onEditDeal={()=>{setModal({type:"deal",data:viewDeal});setViewDeal(null);}}
           onClose={()=>setViewDeal(null)}/>
       )}
