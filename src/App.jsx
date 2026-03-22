@@ -56,6 +56,7 @@ const T = {
     titleF:"Cargo / Título", linkedin:"LinkedIn", company:"Empresa",
     dealName:"Nombre del Deal", value:"Valor", stage:"Stage",
     contact:"Contacto", closingDate:"Fecha de cierre", selectOpt:"— Selecciona —",
+    leadSource:"Cómo llegó", leadSourceCustom:"Origen custom",
     importExport:"Importar / Exportar", importCSV:"Importar CSV", exportCSV:"Exportar CSV",
     downloadTemplate:"Descargar plantilla", importTitle:"Carga masiva",
     importDesc:"Sube un archivo CSV con el formato de la plantilla.",
@@ -136,6 +137,7 @@ const T = {
     titleF:"Title / Role", linkedin:"LinkedIn", company:"Company",
     dealName:"Deal name", value:"Value", stage:"Stage",
     contact:"Contact", closingDate:"Closing date", selectOpt:"— Select —",
+    leadSource:"Lead source", leadSourceCustom:"Custom source",
     importExport:"Import / Export", importCSV:"Import CSV", exportCSV:"Export CSV",
     downloadTemplate:"Download template", importTitle:"Bulk import",
     importDesc:"Upload a CSV following the template format.",
@@ -291,6 +293,7 @@ const startOfWeek = (d=new Date()) => {
 };
 const ACTIVITY_TYPES = ["call","emailType","meeting","task","note"];
 const ACTIVITY_STATUSES = ["pending","inProgress","done","blocked"];
+const LEAD_SOURCES = ["LinkedIn","Email marketing","Referido","Llamada en frío","Custom"];
 
 // ─── Storage helpers (Supabase with localStorage fallback) ────────────────────
 const STORAGE_KEY = "crm5_data";
@@ -367,8 +370,8 @@ async function supabaseSaveAll({ cos, cts, dls, stages }) {
     // Upsert deals (without meddicHistory)
     if (dls.length > 0) {
       await supabase.from('deals').upsert(
-        dls.map(({ id, name, value, stage, companyId: company_id, contactId: contact_id, closingDate: closing_date, notes }) =>
-          ({ id, name, value, stage, company_id, contact_id, closing_date, notes })),
+        dls.map(({ id, name, value, stage, companyId: company_id, contactId: contact_id, closingDate: closing_date, notes, leadSource: lead_source, leadSourceCustom: lead_source_custom }) =>
+          ({ id, name, value, stage, company_id, contact_id, closing_date, notes, lead_source, lead_source_custom })),
         { onConflict: 'id' }
       );
       // Upsert + sync deletes for MEDDIC evals
@@ -451,7 +454,7 @@ async function storageGet(fallback) {
     return {
       co: sbData.co,
       ct: sbData.ct.map(c => ({ ...c, titleF: c.title_f, companyId: c.company_id })),
-      dl: sbData.dl.map(d => ({ ...d, companyId: d.company_id, contactId: d.contact_id, closingDate: d.closing_date })),
+      dl: sbData.dl.map(d => ({ ...d, companyId: d.company_id, contactId: d.contact_id, closingDate: d.closing_date, leadSource: d.lead_source || "", leadSourceCustom: d.lead_source_custom || "" })),
       currency: fallback.currency,
       stages: sbData.stages || fallback.stages,
     };
@@ -1201,6 +1204,7 @@ function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval,
         {co&&<><div style={{color:"#8ea4b8"}}>·</div><div style={{fontSize:12,color:"#5a6b7a"}}>🏢 {co.name}</div></>}
         {ct&&<><div style={{color:"#8ea4b8"}}>·</div><div style={{fontSize:12,color:"#5a6b7a"}}>👤 {ct.name}</div></>}
         {deal.closingDate&&<><div style={{color:"#8ea4b8"}}>·</div><div style={{fontSize:11,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>{t.closing}: {deal.closingDate}</div></>}
+        {(deal.leadSource || deal.leadSourceCustom) && <><div style={{color:"#8ea4b8"}}>·</div><div style={{fontSize:11,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>{t.leadSource}: {deal.leadSource==="Custom"?(deal.leadSourceCustom||"Custom"):deal.leadSource}</div></>}
         <div style={{marginLeft:"auto"}}>
           <Btn ch={<><Ic n="edit" s={11}/>{t.editDeal}</>} v="subtle" sx={{fontSize:11,padding:"4px 10px"}} onClick={onEditDeal}/>
         </div>
@@ -1242,7 +1246,33 @@ function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval,
 // ─── Forms ────────────────────────────────────────────────────────────────────
 function CoForm({init={},t,onSave,onClose}){const[f,setF]=useState({name:"",industry:"",website:"",phone:"",notes:"",...init});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<><Inp label={t.companyName+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.companyName}/><Inp label={t.industry} value={f.industry} onChange={s("industry")} placeholder={t.ph.industry}/><Inp label={t.website} value={f.website} onChange={s("website")} placeholder={t.ph.website}/><Inp label={t.phone} value={f.phone} onChange={s("phone")} placeholder={t.ph.phone}/><Txta label={t.notes} value={f.notes} onChange={s("notes")}/><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="ghost" ch={t.cancel} onClick={onClose}/><Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/></div></>;}
 function CtForm({init={},cos,t,onSave,onClose}){const[f,setF]=useState({name:"",email:"",phone:"",titleF:"",linkedin:"",companyId:"",notes:"",...init});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));const coOpts=[{v:"",l:t.selectOpt},...cos.map(c=>({v:c.id,l:c.name}))];return<><Inp label={t.name+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.name}/><Inp label={t.email} value={f.email} onChange={s("email")} placeholder={t.ph.email}/><Inp label={t.phone} value={f.phone} onChange={s("phone")} placeholder={t.ph.phone}/><Inp label={t.titleF} value={f.titleF} onChange={s("titleF")} placeholder={t.ph.titleF}/><Inp label={t.linkedin} value={f.linkedin} onChange={s("linkedin")} placeholder={t.ph.linkedin}/><Sel label={t.company} value={f.companyId} onChange={s("companyId")} opts={coOpts}/><Txta label={t.notes} value={f.notes} onChange={s("notes")}/><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="ghost" ch={t.cancel} onClick={onClose}/><Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/></div></>;}
-function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){const defaultStage=stages[0]?.name||"";const[f,setF]=useState({name:"",value:0,stage:defaultStage,companyId:"",contactId:"",closingDate:"",notes:"",...init});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));const coOpts=[{v:"",l:t.selectOpt},...cos.map(c=>({v:c.id,l:c.name}))];const ctOpts=[{v:"",l:t.selectOpt},...cts.map(c=>({v:c.id,l:c.name}))];const stOpts=stages.map(st=>({v:st.name,l:st.name}));return<><Inp label={t.dealName+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.dealName}/><Inp label={`${t.value} (${currency})`} type="number" value={f.value} onChange={s("value")}/><Sel label={t.stage} value={f.stage} onChange={s("stage")} opts={stOpts}/><Sel label={t.company} value={f.companyId} onChange={s("companyId")} opts={coOpts}/><Sel label={t.contact} value={f.contactId} onChange={s("contactId")} opts={ctOpts}/><Inp label={t.closingDate} type="date" value={f.closingDate} onChange={s("closingDate")}/><Txta label={t.notes} value={f.notes} onChange={s("notes")}/><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="ghost" ch={t.cancel} onClick={onClose}/><Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/></div></>;}
+function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
+  const defaultStage=stages[0]?.name||"";
+  const [f,setF]=useState({name:"",value:0,stage:defaultStage,companyId:"",contactId:"",leadSource:"",leadSourceCustom:"",closingDate:"",notes:"",...init});
+  const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));
+  const coOpts=[{v:"",l:t.selectOpt},...cos.map(c=>({v:c.id,l:c.name}))];
+  const ctOpts=[{v:"",l:t.selectOpt},...cts.map(c=>({v:c.id,l:c.name}))];
+  const stOpts=stages.map(st=>({v:st.name,l:st.name}));
+  const sourceOpts=[{v:"",l:t.selectOpt},...LEAD_SOURCES.map(x=>({v:x,l:x}))];
+
+  return <>
+    <Inp label={t.dealName+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.dealName}/>
+    <Inp label={`${t.value} (${currency})`} type="number" value={f.value} onChange={s("value")}/>
+    <Sel label={t.stage} value={f.stage} onChange={s("stage")} opts={stOpts}/>
+    <Sel label={t.company} value={f.companyId} onChange={s("companyId")} opts={coOpts}/>
+    <Sel label={t.contact} value={f.contactId} onChange={s("contactId")} opts={ctOpts}/>
+    <Sel label={t.leadSource} value={f.leadSource||""} onChange={s("leadSource")} opts={sourceOpts}/>
+    {(f.leadSource==="Custom") && (
+      <Inp label={t.leadSourceCustom} value={f.leadSourceCustom||""} onChange={s("leadSourceCustom")} placeholder="Ej. Evento/Expo"/>
+    )}
+    <Inp label={t.closingDate} type="date" value={f.closingDate} onChange={s("closingDate")}/>
+    <Txta label={t.notes} value={f.notes} onChange={s("notes")}/>
+    <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}>
+      <Btn v="ghost" ch={t.cancel} onClick={onClose}/>
+      <Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/>
+    </div>
+  </>;
+}
 
 // ─── Import Modal ─────────────────────────────────────────────────────────────
 function ImportModal({type,t,cos,onImportCo,onImportCt,onClose}){const[state,setState]=useState("idle");const[result,setResult]=useState(null);const[dragOver,setDragOver]=useState(false);const fileRef=useRef();const isCo=type==="company";const cols=isCo?CO_COLS:CT_COLS;const templateData=isCo?[{name:"Acme Corp",industry:"Tecnología",website:"acme.com",phone:"+52 55 1234 5678",notes:""}]:[{name:"Ana García",email:"ana@empresa.com",phone:"+52 55 1111 2222",titleF:"CEO",linkedin:"",companyName:"Acme Corp",notes:""}];const downloadTemplate=()=>downloadBlob(toCSV(templateData,cols),isCo?"plantilla_empresas.csv":"plantilla_contactos.csv");const processFile=file=>{if(!file)return;setState("processing");const reader=new FileReader();reader.onload=e=>{const{headers,rows,errors:parseErrors}=parseCSV(e.target.result);const missing=cols.filter(c=>!headers.includes(c));if(missing.length){setResult({ok:0,errors:[`${t.importColError}: ${missing.join(", ")}`],missing:true});setState("result");return;}let ok=0,errors=[...parseErrors.map(pe=>`CSV row ${pe.row+2}: ${pe.message}`)];const imported=[];rows.forEach((row,i)=>{if(!row.name?.trim()){errors.push(`Fila ${i+2}: name vacío`);return;}if(isCo){imported.push({id:uid(),name:row.name.trim(),industry:row.industry||"",website:row.website||"",phone:row.phone||"",notes:row.notes||""});ok++;}else{const co=cos.find(c=>c.name.toLowerCase()===(row.companyName||"").toLowerCase());imported.push({id:uid(),name:row.name.trim(),email:row.email||"",phone:row.phone||"",titleF:row.titleF||"",linkedin:row.linkedin||"",companyId:co?.id||"",notes:row.notes||""});ok++;}});if(isCo)onImportCo(imported);else onImportCt(imported);setResult({ok,errors});setState("result");};reader.readAsText(file,"UTF-8");};const onDrop=e=>{e.preventDefault();setDragOver(false);processFile(e.dataTransfer.files[0]);};return(<Modal title={`${t.importTitle} — ${isCo?t.companies:t.contacts}`} onClose={onClose} wide><div style={{background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:10,padding:14,marginBottom:16}}><p style={{fontSize:12,color:"#5a6b7a",margin:"0 0 10px",lineHeight:1.6}}>{t.importDesc}</p><p style={{fontSize:11,color:"#5a6b7a",margin:"0 0 12px"}}>{t.overwriteWarn}</p><div style={{background:"#ffffff",borderRadius:8,padding:"10px 12px",marginBottom:12}}><div style={{fontSize:10,color:"#6b7d8e",fontFamily:"'JetBrains Mono',monospace",letterSpacing:.7,marginBottom:6,textTransform:"uppercase"}}>Columnas</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{cols.map(c=><span key={c} style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",background:"#c8d6e4",color:"#4a5a6a",borderRadius:5,padding:"2px 8px"}}>{c}</span>)}</div></div><Btn ch={<><Ic n="template" s={12}/>{t.downloadTemplate}</>} v="subtle" onClick={downloadTemplate}/></div>{state==="idle"&&(<div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop} onClick={()=>fileRef.current?.click()} style={{border:`2px dashed ${dragOver?"#003e7e":"#c8d6e4"}`,borderRadius:12,padding:"32px 20px",textAlign:"center",cursor:"pointer",background:dragOver?"#0d1a2e":"#f0f4f8",transition:"all .15s"}}><div style={{color:dragOver?"#27aae1":"#8ea4b8",marginBottom:8}}><Ic n="upload" s={28}/></div><div style={{fontSize:13,color:dragOver?"#27aae1":"#5a6b7a"}}>{t.dragDrop}</div><input ref={fileRef} type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={e=>processFile(e.target.files[0])}/></div>)}{state==="result"&&result&&(<div>{!result.missing&&(<div style={{background:"#e8f5ee",border:"1px solid #a0d4b0",borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}><span style={{color:"#22c55e"}}><Ic n="check" s={16}/></span><span style={{fontSize:13,color:"#22c55e",fontWeight:600}}>{result.ok} {t.importSuccess}</span></div>)}{result.errors?.length>0&&(<div style={{background:"#fde8e8",border:"1px solid #d4a0a0",borderRadius:10,padding:"12px 16px",marginBottom:12}}><div style={{fontSize:12,color:"#ef4444",fontWeight:600,marginBottom:6}}>{result.errors.length} {t.importErrors}</div>{result.errors.map((e,i)=><div key={i} style={{fontSize:11,color:"#9a3535",fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>• {e}</div>)}</div>)}<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn ch={t.close} v="primary" onClick={onClose}/></div></div>)}</Modal>);}

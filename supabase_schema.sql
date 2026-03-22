@@ -29,16 +29,21 @@ create table if not exists contacts (
 
 -- 3. Deals
 create table if not exists deals (
-  id           text primary key default gen_random_uuid()::text,
-  name         text not null,
-  value        numeric default 0,
-  stage        text not null,
-  company_id   text references companies(id) on delete set null,
-  contact_id   text references contacts(id) on delete set null,
-  closing_date date,
-  notes        text,
-  created_at   timestamptz default now()
+  id                 text primary key default gen_random_uuid()::text,
+  name               text not null,
+  value              numeric default 0,
+  stage              text not null,
+  company_id         text references companies(id) on delete set null,
+  contact_id         text references contacts(id) on delete set null,
+  lead_source        text,
+  lead_source_custom text,
+  closing_date       date,
+  notes              text,
+  created_at         timestamptz default now()
 );
+
+alter table deals add column if not exists lead_source text;
+alter table deals add column if not exists lead_source_custom text;
 
 -- 4. MEDDIC evaluations
 create table if not exists meddic_evals (
