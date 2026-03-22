@@ -1281,15 +1281,16 @@ function ImportModal({type,t,cos,onImportCo,onImportCt,onClose}){const[state,set
 function BulkBar({type,t,data,cos,onImportCo,onImportCt}){const[open,setOpen]=useState(false);const[importOpen,setImportOpen]=useState(false);const isCo=type==="company";const handleExport=()=>{const cols=isCo?CO_COLS:CT_COLS;const rows=isCo?data:data.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);return{...ct,companyName:co?.name||""};});const filename=isCo?`empresas_${new Date().toISOString().slice(0,10)}.csv`:`contactos_${new Date().toISOString().slice(0,10)}.csv`;downloadBlob(toCSV(rows,cols),filename);};return(<><div style={{position:"relative",display:"inline-block"}}><Btn ch={<><Ic n="layers" s={12}/>{t.importExport}<Ic n="chevDown" s={11}/></>} v="subtle" onClick={()=>setOpen(p=>!p)}/>{open&&(<div style={{position:"absolute",right:0,top:"calc(100% + 6px)",background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:10,minWidth:200,boxShadow:"0 8px 32px rgba(0,62,126,.1)",zIndex:100,overflow:"hidden"}}><button onClick={()=>{setOpen(false);setImportOpen(true);}} style={{width:"100%",background:"none",border:"none",color:"#1a2a3a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #b8d8eb"}}><Ic n="upload" s={13}/>{t.importCSV}</button><button onClick={()=>{setOpen(false);handleExport();}} style={{width:"100%",background:"none",border:"none",color:"#1a2a3a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #b8d8eb"}}><Ic n="download" s={13}/>{t.exportCSV}</button><button onClick={()=>{setOpen(false);const cols=isCo?CO_COLS:CT_COLS;const tpl=isCo?[{name:"Ejemplo SA",industry:"Retail",website:"ejemplo.com",phone:"+52 55 0000 0000",notes:""}]:[{name:"Juan Pérez",email:"juan@co.com",phone:"+52 55 0000 0000",titleF:"Gerente",linkedin:"",companyName:"Ejemplo SA",notes:""}];downloadBlob(toCSV(tpl,cols),isCo?"plantilla_empresas.csv":"plantilla_contactos.csv");}} style={{width:"100%",background:"none",border:"none",color:"#4a5a6a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit"}}><Ic n="template" s={13}/>{t.downloadTemplate}</button></div>)}</div>{importOpen&&<ImportModal type={type} t={t} cos={cos} onImportCo={onImportCo} onImportCt={onImportCt} onClose={()=>setImportOpen(false)}/>}{open&&<div style={{position:"fixed",inset:0,zIndex:99}} onClick={()=>setOpen(false)}/>}</>);}
 
 // ─── Kanban ───────────────────────────────────────────────────────────────────
-const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit,onDel,onStage,onViewDeal}){
+const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit,onDel,onStage,onViewDeal,fontSizeMode="medium"}){
   const[drag,setDrag]=useState(null);
   const[over,setOver]=useState(null);
+  const zoom = fontSizeMode==="small" ? 0.9 : fontSizeMode==="large" ? 1.18 : 1;
   const closedNames = stages.filter(s=>s.isWon||s.isLost).map(s=>s.name);
   const wonNames = stages.filter(s=>s.isWon).map(s=>s.name);
   const pipe=deals.filter(d=>!closedNames.includes(d.stage)).reduce((s,d)=>s+Number(d.value),0);
   const won=deals.filter(d=>wonNames.includes(d.stage)).reduce((s,d)=>s+Number(d.value),0);
   return(
-    <div>
+    <div style={{zoom}}>
       <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
         {[{l:t.pipelineTotal,v:fv(pipe,currency),c:"#27aae1"},{l:t.closedWon,v:fv(won,currency),c:"#22c55e"},{l:t.totalDeals,v:deals.length,c:"#7c2b83"}].map(s=>(
           <div key={s.l} style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:"10px 16px",flex:1,minWidth:120}}>
@@ -1397,6 +1398,7 @@ function AppInner(){
   const t=T[lang];
   const[tab,setTab]=useState("deals");
   const[pipelineEditorOpen,setPipelineEditorOpen]=useState(false);
+  const[pipelineFontSize,setPipelineFontSize]=useState("medium");
   const[q,setQ]=useState("");
   const[modal,setModal]=useState(null);
   const[viewDeal,setViewDeal]=useState(null);
@@ -1593,7 +1595,12 @@ function AppInner(){
             ))}
           </div>
           {tab==="deals"&&(
-            <div style={{padding:"6px 0"}}>
+            <div style={{padding:"6px 0",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              <div style={{display:"flex",background:"#f0f4f8",border:"1px solid #b8d8eb",borderRadius:7,overflow:"hidden"}}>
+                {[{k:"small",l:"Pequeño"},{k:"medium",l:"Mediano"},{k:"large",l:"Grande"}].map(o=>(
+                  <button key={o.k} onClick={()=>setPipelineFontSize(o.k)} style={{background:pipelineFontSize===o.k?"#003e7e":"transparent",color:pipelineFontSize===o.k?"#fff":"#6b7d8e",border:"none",padding:"4px 10px",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{o.l}</button>
+                ))}
+              </div>
               <Btn v="subtle" ch={<><Ic n="edit" s={12}/>{t.pipelineEditor}</>} onClick={()=>setPipelineEditorOpen(true)} sx={{fontSize:11,padding:"5px 12px"}}/>
             </div>
           )}
@@ -1612,7 +1619,8 @@ function AppInner(){
             <Kanban deals={fDl} cos={cos} cts={cts} t={t} lang={lang} currency={currency} stages={stages}
               onEdit={d=>setModal({type:"deal",data:d})}
               onDel={requestDelDl} onStage={chStage}
-              onViewDeal={d=>setViewDeal({...dls.find(x=>x.id===d.id)})}/>
+              onViewDeal={d=>setViewDeal({...dls.find(x=>x.id===d.id)})}
+              fontSizeMode={pipelineFontSize}/>
           )}
           {tab==="companies"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:11}}>
