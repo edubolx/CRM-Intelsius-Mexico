@@ -23,6 +23,9 @@ const T = {
     meddicNotesPlaceholder:"¿Qué información respalda esta calificación?",
     meddicDate:"Fecha",
     meddicNoHistory:"Sin evaluaciones previas.",
+    meddicSaved:"Evaluación guardada correctamente.",
+    meddicDeleteEval:"Eliminar evaluación",
+    meddicDeleteConfirm:"¿Seguro que quieres eliminar esta evaluación?",
     viewDeal:"Ver deal",
     closeDeal:"Cerrar",
     companyName:"Nombre de empresa", industry:"Industria", website:"Sitio web",
@@ -77,6 +80,9 @@ const T = {
     meddicNotesPlaceholder:"What information supports this score?",
     meddicDate:"Date",
     meddicNoHistory:"No previous evaluations.",
+    meddicSaved:"Evaluation saved successfully.",
+    meddicDeleteEval:"Delete evaluation",
+    meddicDeleteConfirm:"Are you sure you want to delete this evaluation?",
     viewDeal:"View deal",
     closeDeal:"Close",
     companyName:"Company name", industry:"Industry", website:"Website",
@@ -292,12 +298,21 @@ async function supabaseSaveAll({ cos, cts, dls, stages }) {
           ({ id, name, value, stage, company_id, contact_id, closing_date, notes })),
         { onConflict: 'id' }
       );
-      // Upsert meddic evals
+      // Upsert + sync deletes for MEDDIC evals
       const allEvals = dls.flatMap(d =>
         (d.meddicHistory || []).map(e => ({ id: e.id, deal_id: d.id, date: e.date, meddic: e.meddic }))
       );
       if (allEvals.length > 0) {
         await supabase.from('meddic_evals').upsert(allEvals, { onConflict: 'id' });
+      }
+      const { data: existingEvals } = await supabase.from('meddic_evals').select('id,deal_id');
+      const validDealIds = new Set(dls.map(d=>d.id));
+      const validEvalIds = new Set(allEvals.map(e=>e.id));
+      const staleIds = (existingEvals || [])
+        .filter(e => validDealIds.has(e.deal_id) && !validEvalIds.has(e.id))
+        .map(e => e.id);
+      if (staleIds.length > 0) {
+        await supabase.from('meddic_evals').delete().in('id', staleIds);
       }
     }
     // Upsert stages
@@ -750,7 +765,7 @@ function ScoreBar({value, onChange, color}){
 }
 
 // ─── MEDDIC Panel ─────────────────────────────────────────────────────────────
-function MeddicPanel({deal, lang, t, onSaveEval}){
+function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
   const latest = deal.meddicHistory?.slice(-1)[0] || null;
   const [draft, setDraft] = useState(()=>({
     date: today(),
@@ -758,6 +773,7 @@ function MeddicPanel({deal, lang, t, onSaveEval}){
   }));
   const [showHistory, setShowHistory] = useState(false);
   const [expandedKey, setExpandedKey] = useState(null);
+  const [saveNotice, setSaveNotice] = useState(false);
 
   const total = calcTotal(draft.meddic);
   const prevTotal = latest ? calcTotal(latest.meddic) : null;
@@ -768,6 +784,8 @@ function MeddicPanel({deal, lang, t, onSaveEval}){
 
   const handleSave = () => {
     onSaveEval({ id:uid(), date:draft.date, meddic:draft.meddic });
+    setSaveNotice(true);
+    setTimeout(()=>setSaveNotice(false), 1800);
   };
 
   return(
@@ -859,6 +877,11 @@ function MeddicPanel({deal, lang, t, onSaveEval}){
         <div style={{flexGrow:1}}/>
         <Btn ch={<><Ic n="check" s={12}/>{t.meddicSaveEval}</>} v="success" onClick={handleSave}/>
       </div>
+      {saveNotice && (
+        <div style={{marginTop:8,fontSize:11,color:"#22c55e",fontFamily:"'JetBrains Mono',monospace",display:"flex",alignItems:"center",gap:6}}>
+          <Ic n="check" s={11}/>{t.meddicSaved}
+        </div>
+      )}
 
       {/* History */}
       {showHistory && (
@@ -880,6 +903,13 @@ function MeddicPanel({deal, lang, t, onSaveEval}){
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       {d!==null&&d!==0&&<span style={{fontSize:10,color:d>0?"#22c55e":"#ef4444",fontFamily:"'JetBrains Mono',monospace"}}>{d>0?"+":""}{d}</span>}
                       <ScoreRing score={tot} size={36} strokeW={3}/>
+                      <button
+                        title={t.meddicDeleteEval}
+                        onClick={()=>{ if(window.confirm(t.meddicDeleteConfirm)){ onDeleteEval(ev.id); } }}
+                        style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:2,opacity:.75}}
+                      >
+                        <Ic n="trash" s={12}/>
+                      </button>
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -917,7 +947,7 @@ function MeddicPanel({deal, lang, t, onSaveEval}){
 }
 
 // ─── Deal Detail Modal ────────────────────────────────────────────────────────
-function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval, onEditDeal, onClose}){
+function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval, onDeleteEval, onEditDeal, onClose}){
   const [tab, setTab] = useState("meddic");
   const co = cos.find(c=>c.id===deal.companyId);
   const ct = cts.find(c=>c.id===deal.contactId);
@@ -955,7 +985,7 @@ function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval,
       </div>
 
       {tab==="meddic" && (
-        <MeddicPanel deal={deal} lang={lang} t={t} onSaveEval={onSaveEval}/>
+        <MeddicPanel deal={deal} lang={lang} t={t} onSaveEval={onSaveEval} onDeleteEval={onDeleteEval}/>
       )}
       {tab==="notes" && (
         <div style={{fontSize:13,color:"#5a6b7a",lineHeight:1.7,whiteSpace:"pre-wrap"}}>
@@ -1184,6 +1214,17 @@ function AppInner(){
     });
   };
 
+  const deleteEval=(dealId, evalId)=>{
+    setDls(p=>p.map(d=>{
+      if(d.id!==dealId)return d;
+      return {...d, meddicHistory:(d.meddicHistory||[]).filter(e=>e.id!==evalId)};
+    }));
+    setViewDeal(p=>{
+      if(!p||p.id!==dealId)return p;
+      return {...p, meddicHistory:(p.meddicHistory||[]).filter(e=>e.id!==evalId)};
+    });
+  };
+
   const importCos=rows=>setCos(p=>{const ex=new Set(p.map(c=>c.name.toLowerCase()));return[...p,...rows.filter(r=>!ex.has(r.name.toLowerCase()))];});
   const importCts=rows=>setCts(p=>{const ex=new Set(p.map(c=>c.email?.toLowerCase()).filter(Boolean));return[...p,...rows.filter(r=>!r.email||!ex.has(r.email.toLowerCase()))];});
 
@@ -1302,6 +1343,7 @@ function AppInner(){
           deal={viewDeal}
           cos={cos} cts={cts} lang={lang} currency={currency} stages={stages} t={t}
           onSaveEval={ev=>saveEval(viewDeal.id,ev)}
+          onDeleteEval={evalId=>deleteEval(viewDeal.id,evalId)}
           onEditDeal={()=>{setModal({type:"deal",data:viewDeal});setViewDeal(null);}}
           onClose={()=>setViewDeal(null)}/>
       )}
