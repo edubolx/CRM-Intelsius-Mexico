@@ -1304,9 +1304,17 @@ function CtForm({init={},cos,t,onSave,onClose}){const[f,setF]=useState({name:"",
 function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
   const defaultStage=stages[0]?.name||"";
   const [f,setF]=useState({name:"",value:0,stage:defaultStage,companyId:"",contactId:"",leadSource:"",leadSourceCustom:"",closingDate:"",notes:"",...init});
-  const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));
+  const s=k=>e=>setF(p=>{
+    const val = e.target.value;
+    if(k==="companyId"){
+      const contactStillValid = (cts||[]).some(c=>c.id===p.contactId && c.companyId===val);
+      return { ...p, companyId: val, contactId: contactStillValid ? p.contactId : "" };
+    }
+    return {...p,[k]:val};
+  });
   const coOpts=[{v:"",l:t.selectOpt},...cos.map(c=>({v:c.id,l:c.name}))];
-  const ctOpts=[{v:"",l:t.selectOpt},...cts.map(c=>({v:c.id,l:c.name}))];
+  const filteredContacts = f.companyId ? cts.filter(c=>c.companyId===f.companyId) : [];
+  const ctOpts=[{v:"",l:t.selectOpt},...filteredContacts.map(c=>({v:c.id,l:c.name}))];
   const stOpts=stages.map(st=>({v:st.name,l:st.name}));
   const sourceOpts=[{v:"",l:t.selectOpt},...LEAD_SOURCES.map(x=>({v:x,l:x}))];
 
