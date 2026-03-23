@@ -553,7 +553,7 @@ function CRMProvider({ children }) {
   },[data]);
 
   const ctx = useMemo(()=>({
-    ...data, dispatch, loading, saveStatus,
+    ...data, dispatch, loading, saveStatus, setSaveStatus,
     // Convenience setters
     setCos: p => dispatch({type:"SET_COS",payload:p}),
     setCts: p => dispatch({type:"SET_CTS",payload:p}),
@@ -1435,7 +1435,7 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
 
 // ─── App Inner (consumes CRM context) ─────────────────────────────────────────
 function AppInner(){
-  const { cos, cts, dls, users, currency, stages, loading, saveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages } = useCRM();
+  const { cos, cts, dls, users, currency, stages, loading, saveStatus, setSaveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages } = useCRM();
   const[lang,setLang]=useState("es");
   const t=T[lang];
   const[tab,setTab]=useState("deals");
@@ -1447,6 +1447,11 @@ function AppInner(){
   const[confirmDel,setConfirmDel]=useState(null);
 
   // ── CRUD operations ──
+  const ensureSbOk = (result, op) => {
+    if (result?.error) throw new Error(`${op}: ${result.error.message}`);
+    return result;
+  };
+
   const withSaveStatus = async (fn) => {
     setSaveStatus("saving");
     try {
@@ -1464,7 +1469,8 @@ function AppInner(){
   const saveCo=async f=>{
     const row = { ...(f.id?f:{...f,id:uid()}) };
     const ok = await withSaveStatus(async()=>{
-      await supabase.from('companies').upsert([{ id:row.id, name:row.name, industry:row.industry||"", website:row.website||"", phone:row.phone||"", notes:row.notes||"" }], { onConflict:'id' });
+      const res = await supabase.from('companies').upsert([{ id:row.id, name:row.name, industry:row.industry||"", website:row.website||"", phone:row.phone||"", notes:row.notes||"" }], { onConflict:'id' });
+      ensureSbOk(res, 'save company');
     });
     if(!ok) return;
     setCos(p=>f.id?p.map(c=>c.id===row.id?row:c):[...p,row]);
@@ -1474,7 +1480,8 @@ function AppInner(){
   const saveCt=async f=>{
     const row = { ...(f.id?f:{...f,id:uid()}) };
     const ok = await withSaveStatus(async()=>{
-      await supabase.from('contacts').upsert([{ id:row.id, name:row.name, email:row.email||"", phone:row.phone||"", title_f:row.titleF||"", linkedin:row.linkedin||"", company_id:row.companyId||null, notes:row.notes||"" }], { onConflict:'id' });
+      const res = await supabase.from('contacts').upsert([{ id:row.id, name:row.name, email:row.email||"", phone:row.phone||"", title_f:row.titleF||"", linkedin:row.linkedin||"", company_id:row.companyId||null, notes:row.notes||"" }], { onConflict:'id' });
+      ensureSbOk(res, 'save contact');
     });
     if(!ok) return;
     setCts(p=>f.id?p.map(c=>c.id===row.id?row:c):[...p,row]);
@@ -1484,7 +1491,8 @@ function AppInner(){
   const saveUsr=async f=>{
     const row = { ...(f.id?f:{...f,id:uid()}) };
     const ok = await withSaveStatus(async()=>{
-      await supabase.from('crm_users').upsert([{ id:row.id, name:row.name, alias:row.alias, email:row.email }], { onConflict:'id' });
+      const res = await supabase.from('crm_users').upsert([{ id:row.id, name:row.name, alias:row.alias, email:row.email }], { onConflict:'id' });
+      ensureSbOk(res, 'save user');
     });
     if(!ok) return;
     setUsers(p=>f.id?p.map(u=>u.id===row.id?row:u):[...p,row]);
@@ -1495,7 +1503,8 @@ function AppInner(){
     const base={meddicHistory:[],activities:[]};
     const row = f.id ? {...dls.find(d=>d.id===f.id), ...f} : {...base,...f,id:uid()};
     const ok = await withSaveStatus(async()=>{
-      await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
+      const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
+      ensureSbOk(res, 'save deal');
     });
     if(!ok) return;
     setDls(p=>f.id?p.map(d=>d.id===row.id?row:d):[...p,row]);
