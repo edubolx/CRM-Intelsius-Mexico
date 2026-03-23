@@ -372,7 +372,7 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
     if (cts.length > 0) {
       await supabase.from('contacts').upsert(
         cts.map(({ id, name, email, phone, titleF: title_f, linkedin, companyId: company_id, notes }) =>
-          ({ id, name, email, phone, title_f, linkedin, company_id, notes })),
+          ({ id, name, email, phone, title_f, linkedin, company_id: company_id || null, notes })),
         { onConflict: 'id' }
       );
     }
@@ -380,7 +380,7 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
     if (dls.length > 0) {
       await supabase.from('deals').upsert(
         dls.map(({ id, name, value, stage, companyId: company_id, contactId: contact_id, closingDate: closing_date, notes, leadSource: lead_source, leadSourceCustom: lead_source_custom }) =>
-          ({ id, name, value, stage, company_id, contact_id, closing_date, notes, lead_source, lead_source_custom })),
+          ({ id, name, value, stage, company_id: company_id || null, contact_id: contact_id || null, closing_date, notes, lead_source, lead_source_custom })),
         { onConflict: 'id' }
       );
       // Upsert + sync deletes for MEDDIC evals
