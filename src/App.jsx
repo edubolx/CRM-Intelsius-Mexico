@@ -5,7 +5,7 @@ import { supabase } from './supabaseClient.js'
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
   es: {
-    appName:"CRM Intelsius México", pipeline:"Pipeline", companies:"Empresas", contacts:"Contactos",
+    appName:"CRM Intelsius México", pipeline:"Pipeline", companies:"Empresas", contacts:"Contactos", usersTab:"Usuarios",
     newDeal:"Deal", newCompany:"Empresa", newContact:"Contacto",
     editDeal:"Editar Deal", newDealTitle:"Nuevo Deal",
     editCompany:"Editar Empresa", newCompanyTitle:"Nueva Empresa",
@@ -59,6 +59,8 @@ const T = {
     dealName:"Nombre del Deal", value:"Valor", stage:"Stage",
     contact:"Contacto", closingDate:"Fecha de cierre", selectOpt:"— Selecciona —",
     leadSource:"Cómo llegó", leadSourceCustom:"Origen custom",
+    newUser:"Usuario", newUserTitle:"Nuevo usuario", editUser:"Editar usuario", noUsers:"No hay usuarios aún.",
+    userAlias:"Alias", userEmail:"Correo", userName:"Nombre",
     importExport:"Importar / Exportar", importCSV:"Importar CSV", exportCSV:"Exportar CSV",
     downloadTemplate:"Descargar plantilla", importTitle:"Carga masiva",
     importDesc:"Sube un archivo CSV con el formato de la plantilla.",
@@ -88,7 +90,7 @@ const T = {
          titleF:"CEO, Director...", linkedin:"linkedin.com/in/...", dealName:"Ej. Enterprise Deal" },
   },
   en: {
-    appName:"CRM Intelsius México", pipeline:"Pipeline", companies:"Companies", contacts:"Contacts",
+    appName:"CRM Intelsius México", pipeline:"Pipeline", companies:"Companies", contacts:"Contacts", usersTab:"Users",
     newDeal:"Deal", newCompany:"Company", newContact:"Contact",
     editDeal:"Edit Deal", newDealTitle:"New Deal",
     editCompany:"Edit Company", newCompanyTitle:"New Company",
@@ -142,6 +144,8 @@ const T = {
     dealName:"Deal name", value:"Value", stage:"Stage",
     contact:"Contact", closingDate:"Closing date", selectOpt:"— Select —",
     leadSource:"Lead source", leadSourceCustom:"Custom source",
+    newUser:"User", newUserTitle:"New user", editUser:"Edit user", noUsers:"No users yet.",
+    userAlias:"Alias", userEmail:"Email", userName:"Name",
     importExport:"Import / Export", importCSV:"Import CSV", exportCSV:"Export CSV",
     downloadTemplate:"Download template", importTitle:"Bulk import",
     importDesc:"Upload a CSV following the template format.",
@@ -307,12 +311,13 @@ const uid = () => crypto.randomUUID();
 async function supabaseLoad() {
   if (!supabase) return null;
   try {
-    const [{ data: cos }, { data: cts }, { data: dls_raw }, { data: evals }, { data: stages_raw }] = await Promise.all([
+    const [{ data: cos }, { data: cts }, { data: dls_raw }, { data: evals }, { data: stages_raw }, { data: users_raw }] = await Promise.all([
       supabase.from('companies').select('*').order('created_at'),
       supabase.from('contacts').select('*').order('created_at'),
       supabase.from('deals').select('*').order('created_at'),
       supabase.from('meddic_evals').select('*').order('date'),
       supabase.from('pipeline_stages').select('*').order('position'),
+      supabase.from('crm_users').select('*').order('created_at'),
     ]);
 
     let activities = [];
@@ -346,14 +351,14 @@ async function supabaseLoad() {
       ? stages_raw.map(s => ({ id: s.id, name: s.name, emoji: s.emoji, bg: s.bg, border: s.border, accent: s.accent, isWon: s.is_won, isLost: s.is_lost }))
       : null;
 
-    return { co: cos || [], ct: cts || [], dl: dls, stages };
+    return { co: cos || [], ct: cts || [], dl: dls, stages, users: users_raw || [] };
   } catch (err) {
     console.error('Supabase load error:', err);
     return null;
   }
 }
 
-async function supabaseSaveAll({ cos, cts, dls, stages }) {
+async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
   if (!supabase) return false;
   try {
     // Upsert companies
@@ -417,6 +422,14 @@ async function supabaseSaveAll({ cos, cts, dls, stages }) {
         // Activity deletes are handled explicitly when user clicks delete.
       } catch {}
     }
+    // Upsert users
+    if ((users || []).length > 0) {
+      await supabase.from('crm_users').upsert(
+        users.map(({id,name,alias,email})=>({id,name,alias,email})),
+        { onConflict: 'id' }
+      );
+    }
+
     // Upsert stages
     if (stages.length > 0) {
       await supabase.from('pipeline_stages').upsert(
@@ -437,7 +450,7 @@ function lsGet(fallback) {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const p = JSON.parse(raw);
-      return { co: p.co || fallback.co, ct: p.ct || fallback.ct, dl: p.dl || fallback.dl, currency: p.currency || fallback.currency, stages: p.stages || fallback.stages };
+      return { co: p.co || fallback.co, ct: p.ct || fallback.ct, dl: p.dl || fallback.dl, users: p.users || fallback.users, currency: p.currency || fallback.currency, stages: p.stages || fallback.stages };
     }
   } catch {}
   return fallback;
@@ -454,7 +467,8 @@ async function storageGet(fallback) {
       co: sbData.co,
       ct: sbData.ct.map(c => ({ ...c, titleF: c.title_f, companyId: c.company_id })),
       dl: sbData.dl.map(d => ({ ...d, companyId: d.company_id, contactId: d.contact_id, closingDate: d.closing_date, leadSource: d.lead_source || "", leadSourceCustom: d.lead_source_custom || "" })),
-      currency: fallback.currency,
+      users: sbData.users || fallback.users,
+      currency: fallback.currency || "USD",
       stages: sbData.stages || fallback.stages,
     };
   }
@@ -462,7 +476,7 @@ async function storageGet(fallback) {
 }
 
 async function storageSave(data) {
-  const sbOk = await supabaseSaveAll({ cos: data.co, cts: data.ct, dls: data.dl, stages: data.stages });
+  const sbOk = await supabaseSaveAll({ cos: data.co, cts: data.ct, dls: data.dl, stages: data.stages, users: data.users || [] });
   if (!sbOk) lsSave(data);
   return true;
 }
@@ -476,13 +490,14 @@ const SDL=[
   {id:"sd2",name:"Licencia Anual",value:45000,stage:"Calificado",companyId:"sc2",contactId:"sct2",closingDate:"2026-05-15",notes:"",meddicHistory:[]},
   {id:"sd3",name:"Consultoría + Muestras",value:18000,stage:"Muestras entregadas",companyId:"sc1",contactId:"sct1",closingDate:"2026-07-01",notes:"Muestras enviadas el 10 mar",meddicHistory:[]},
 ];
-const SAMPLE_DATA = { co: SC, ct: SCT, dl: SDL, currency: "MXN", stages: DEFAULT_STAGES };
+const SAMPLE_USERS = [{id:"u1",name:"Edu",alias:"Edu",email:"eduardo.bolanos@intelsius.com"}];
+const SAMPLE_DATA = { co: SC, ct: SCT, dl: SDL, users: SAMPLE_USERS, currency: "USD", stages: DEFAULT_STAGES };
 
 // ─── CRM Data Context & Reducer ───────────────────────────────────────────────
 const CRMContext = createContext(null);
 const useCRM = () => useContext(CRMContext);
 
-const initialDataState = { cos:[], cts:[], dls:[], currency:"MXN", stages:DEFAULT_STAGES };
+const initialDataState = { cos:[], cts:[], dls:[], users:[], currency:"USD", stages:DEFAULT_STAGES };
 
 function crmReducer(state, action) {
   switch(action.type) {
@@ -490,6 +505,7 @@ function crmReducer(state, action) {
     case "SET_COS":    return { ...state, cos: typeof action.payload==="function"?action.payload(state.cos):action.payload };
     case "SET_CTS":    return { ...state, cts: typeof action.payload==="function"?action.payload(state.cts):action.payload };
     case "SET_DLS":    return { ...state, dls: typeof action.payload==="function"?action.payload(state.dls):action.payload };
+    case "SET_USERS":  return { ...state, users: typeof action.payload==="function"?action.payload(state.users):action.payload };
     case "SET_CURRENCY": return { ...state, currency: action.payload };
     case "SET_STAGES": return { ...state, stages: action.payload };
     default: return state;
@@ -509,7 +525,7 @@ function CRMProvider({ children }) {
     (async()=>{
       const loaded = await storageGet(SAMPLE_DATA);
       if(!cancelled){
-        dispatch({ type:"LOAD", payload:{ cos:loaded.co, cts:loaded.ct, dls:loaded.dl, currency:loaded.currency||"MXN", stages:loaded.stages||DEFAULT_STAGES }});
+        dispatch({ type:"LOAD", payload:{ cos:loaded.co, cts:loaded.ct, dls:loaded.dl, users:loaded.users||[], currency:loaded.currency||"USD", stages:loaded.stages||DEFAULT_STAGES }});
         setLoading(false);
         setTimeout(()=>{ initialLoadDone.current = true; }, 50);
       }
@@ -523,7 +539,7 @@ function CRMProvider({ children }) {
     if(saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async()=>{
       setSaveStatus("saving");
-      const ok = await storageSave({ co:data.cos, ct:data.cts, dl:data.dls, currency:data.currency, stages:data.stages });
+      const ok = await storageSave({ co:data.cos, ct:data.cts, dl:data.dls, users:data.users, currency:data.currency, stages:data.stages });
       setSaveStatus(ok?"saved":"error");
       setTimeout(()=>setSaveStatus("idle"), 2000);
     }, 500);
@@ -536,6 +552,7 @@ function CRMProvider({ children }) {
     setCos: p => dispatch({type:"SET_COS",payload:p}),
     setCts: p => dispatch({type:"SET_CTS",payload:p}),
     setDls: p => dispatch({type:"SET_DLS",payload:p}),
+    setUsers: p => dispatch({type:"SET_USERS",payload:p}),
     setCurrency: v => dispatch({type:"SET_CURRENCY",payload:v}),
     setStages: v => dispatch({type:"SET_STAGES",payload:v}),
   }),[data, loading, saveStatus]);
@@ -1048,7 +1065,7 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
   );
 }
 
-function ActivitiesPanel({deal,t,onAddActivity,onDeleteActivity,onUpdateActivityStatus,onUpdateActivity}){
+function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateActivityStatus,onUpdateActivity}){
   const emptyForm = { type:"task", title:"", dueDate:today(), responsible:"", status:"pending", comment:"" };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -1088,7 +1105,7 @@ function ActivitiesPanel({deal,t,onAddActivity,onDeleteActivity,onUpdateActivity
         <Sel label={t.activityType} value={form.type} onChange={e=>setF("type",e.target.value)} opts={typeOpts}/>
         <Inp label={t.activityTitle+" *"} value={form.title} onChange={e=>setF("title",e.target.value)} />
         <Inp label={t.activityDueDate} type="date" value={form.dueDate} onChange={e=>setF("dueDate",e.target.value)} />
-        <Inp label={t.activityResponsible} value={form.responsible} onChange={e=>setF("responsible",e.target.value)} />
+        <Sel label={t.activityResponsible} value={form.responsible} onChange={e=>setF("responsible",e.target.value)} opts={[{v:"",l:t.selectOpt},...(users||[]).map(u=>({v:u.alias||u.name,l:`${u.alias||u.name} (${u.name})`}))]} />
         <Sel label={t.activityStatus} value={form.status} onChange={e=>setF("status",e.target.value)} opts={statusOpts}/>
       </div>
       <Txta label={t.activityComment} value={form.comment} onChange={e=>setF("comment",e.target.value)} />
@@ -1199,7 +1216,7 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
 }
 
 // ─── Deal Detail Modal ────────────────────────────────────────────────────────
-function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval, onDeleteEval, onAddActivity, onDeleteActivity, onUpdateActivityStatus, onUpdateActivity, onEditDeal, onClose}){
+function DealDetailModal({deal, cos, cts, users, lang, currency, stages, t, onSaveEval, onDeleteEval, onAddActivity, onDeleteActivity, onUpdateActivityStatus, onUpdateActivity, onEditDeal, onClose}){
   const [tab, setTab] = useState(deal._openTab || "meddic");
   const co = cos.find(c=>c.id===deal.companyId);
   const ct = cts.find(c=>c.id===deal.contactId);
@@ -1249,6 +1266,7 @@ function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval,
         <ActivitiesPanel
           deal={deal}
           t={t}
+          users={users}
           onAddActivity={onAddActivity}
           onDeleteActivity={onDeleteActivity}
           onUpdateActivityStatus={onUpdateActivityStatus}
@@ -1260,6 +1278,8 @@ function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval,
 }
 
 // ─── Forms ────────────────────────────────────────────────────────────────────
+function UsrForm({init={},t,onSave,onClose}){const[f,setF]=useState({name:"",alias:"",email:"",...init});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<><Inp label={t.userName+" *"} value={f.name} onChange={s("name")} /><Inp label={t.userAlias+" *"} value={f.alias} onChange={s("alias")} /><Inp label={t.userEmail+" *"} value={f.email} onChange={s("email")} /><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="ghost" ch={t.cancel} onClick={onClose}/><Btn ch={t.save} onClick={()=>f.name&&f.alias&&f.email&&onSave(f)}/></div></>;}
+
 function CoForm({init={},t,onSave,onClose}){const[f,setF]=useState({name:"",industry:"",website:"",phone:"",notes:"",...init});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<><Inp label={t.companyName+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.companyName}/><Inp label={t.industry} value={f.industry} onChange={s("industry")} placeholder={t.ph.industry}/><Inp label={t.website} value={f.website} onChange={s("website")} placeholder={t.ph.website}/><Inp label={t.phone} value={f.phone} onChange={s("phone")} placeholder={t.ph.phone}/><Txta label={t.notes} value={f.notes} onChange={s("notes")}/><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="ghost" ch={t.cancel} onClick={onClose}/><Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/></div></>;}
 function CtForm({init={},cos,t,onSave,onClose}){const[f,setF]=useState({name:"",email:"",phone:"",titleF:"",linkedin:"",companyId:"",notes:"",...init});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));const coOpts=[{v:"",l:t.selectOpt},...cos.map(c=>({v:c.id,l:c.name}))];return<><Inp label={t.name+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.name}/><Inp label={t.email} value={f.email} onChange={s("email")} placeholder={t.ph.email}/><Inp label={t.phone} value={f.phone} onChange={s("phone")} placeholder={t.ph.phone}/><Inp label={t.titleF} value={f.titleF} onChange={s("titleF")} placeholder={t.ph.titleF}/><Inp label={t.linkedin} value={f.linkedin} onChange={s("linkedin")} placeholder={t.ph.linkedin}/><Sel label={t.company} value={f.companyId} onChange={s("companyId")} opts={coOpts}/><Txta label={t.notes} value={f.notes} onChange={s("notes")}/><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="ghost" ch={t.cancel} onClick={onClose}/><Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/></div></>;}
 function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
@@ -1409,7 +1429,7 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
 
 // ─── App Inner (consumes CRM context) ─────────────────────────────────────────
 function AppInner(){
-  const { cos, cts, dls, currency, stages, loading, saveStatus, setCos, setCts, setDls, setCurrency, setStages } = useCRM();
+  const { cos, cts, dls, users, currency, stages, loading, saveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages } = useCRM();
   const[lang,setLang]=useState("es");
   const t=T[lang];
   const[tab,setTab]=useState("deals");
@@ -1423,6 +1443,7 @@ function AppInner(){
   // ── CRUD operations ──
   const saveCo=f=>{f.id?setCos(p=>p.map(c=>c.id===f.id?f:c)):setCos(p=>[...p,{...f,id:uid()}]);setModal(null);};
   const saveCt=f=>{f.id?setCts(p=>p.map(c=>c.id===f.id?f:c)):setCts(p=>[...p,{...f,id:uid()}]);setModal(null);};
+  const saveUsr=f=>{f.id?setUsers(p=>p.map(u=>u.id===f.id?f:u)):setUsers(p=>[...p,{...f,id:uid()}]);setModal(null);};
   const saveDl=f=>{
     const base={meddicHistory:[],activities:[]};
     if(f.id){setDls(p=>p.map(d=>d.id===f.id?{...d,...f}:d));}
@@ -1492,6 +1513,14 @@ function AppInner(){
     });
   };
 
+  const requestDelUsr=(id)=>{
+    const u = users.find(x=>x.id===id);
+    if(!u) return;
+    if(window.confirm(`¿Eliminar usuario ${u.alias || u.name}?`)){
+      setUsers(p=>p.filter(x=>x.id!==id));
+    }
+  };
+
   const saveEval=(dealId,ev)=>{
     setDls(p=>p.map(d=>{
       if(d.id!==dealId)return d;
@@ -1551,10 +1580,11 @@ function AppInner(){
   const fCo=useMemo(()=>cos.filter(c=>c.name.toLowerCase().includes(ql)||c.industry?.toLowerCase().includes(ql)),[cos,ql]);
   const fCt=useMemo(()=>cts.filter(c=>c.name.toLowerCase().includes(ql)||c.email?.toLowerCase().includes(ql)),[cts,ql]);
   const fDl=useMemo(()=>dls.filter(d=>d.name.toLowerCase().includes(ql)),[dls,ql]);
+  const fUs=useMemo(()=>users.filter(u=>u.name.toLowerCase().includes(ql)||u.alias?.toLowerCase().includes(ql)||u.email?.toLowerCase().includes(ql)),[users,ql]);
 
-  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"activities",l:t.activities,i:"history"}];
-  const addL=tab==="deals"?t.newDeal:tab==="companies"?t.newCompany:t.newContact;
-  const addT=tab==="deals"?"deal":tab==="companies"?"company":"contact";
+  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
+  const addL=tab==="deals"?t.newDeal:tab==="companies"?t.newCompany:tab==="contacts"?t.newContact:tab==="users"?t.newUser:null;
+  const addT=tab==="deals"?"deal":tab==="companies"?"company":tab==="contacts"?"contact":tab==="users"?"user":null;
 
   // ── Show loading screen while data loads ──
   if(loading) return <LoadingScreen lang={lang}/>;
@@ -1604,7 +1634,7 @@ function AppInner(){
               <input value={q} onChange={e=>setQ(e.target.value)} placeholder={t.search}
                 style={{background:"#ffffff",border:"1px solid #b8d8eb",borderRadius:7,padding:"6px 11px 6px 27px",color:"#1a2a3a",fontSize:12,fontFamily:"inherit",outline:"none",width:160}}/>
             </div>
-            <Btn ch={<><Ic n="plus" s={12}/>{addL}</>} onClick={()=>setModal({type:addT,data:{}})} sx={{padding:"6px 14px"}}/>
+            {addT && <Btn ch={<><Ic n="plus" s={12}/>{addL}</>} onClick={()=>setModal({type:addT,data:{}})} sx={{padding:"6px 14px"}}/>}
           </div>
         </header>
 
@@ -1628,7 +1658,7 @@ function AppInner(){
               <Btn v="subtle" ch={<><Ic n="edit" s={12}/>{t.pipelineEditor}</>} onClick={()=>setPipelineEditorOpen(true)} sx={{fontSize:11,padding:"5px 12px"}}/>
             </div>
           )}
-          {tab!=="deals"&&(
+          {(tab==="companies"||tab==="contacts")&&(
             <div style={{padding:"6px 0"}}>
               <BulkBar type={tab==="companies"?"company":"contact"} t={t}
                 data={tab==="companies"?cos:cts} cos={cos}
@@ -1661,6 +1691,26 @@ function AppInner(){
           {tab==="activities"&&(
             <ActivitiesDashboard dls={dls} t={t} onUpdateActivityStatus={updateActivityStatus} onOpenActivity={openDealActivities}/>
           )}
+          {tab==="users"&&(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:11}}>
+              {fUs.map(u=>(
+                <div key={u.id} style={{background:"#ffffff",border:"1px solid #b8d8eb",borderRadius:13,padding:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:600,color:"#1a2a3a"}}>{u.name}</div>
+                      <div style={{fontSize:11,color:"#7c2b83",marginTop:1}}>@{u.alias}</div>
+                    </div>
+                    <div style={{display:"flex",gap:3}}>
+                      <button onClick={()=>setModal({type:"user",data:u})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button>
+                      <button onClick={()=>requestDelUsr(u.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button>
+                    </div>
+                  </div>
+                  <div style={{marginTop:8,fontSize:11,color:"#5a6b7a"}}>✉️ {u.email}</div>
+                </div>
+              ))}
+              {fUs.length===0&&<div style={{color:"#c8d6e4",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noUsers}</div>}
+            </div>
+          )}
         </main>
       </div>
 
@@ -1668,7 +1718,7 @@ function AppInner(){
       {viewDeal&&(
         <DealDetailModal
           deal={viewDeal}
-          cos={cos} cts={cts} lang={lang} currency={currency} stages={stages} t={t}
+          cos={cos} cts={cts} users={users} lang={lang} currency={currency} stages={stages} t={t}
           onSaveEval={ev=>saveEval(viewDeal.id,ev)}
           onDeleteEval={evalId=>deleteEval(viewDeal.id,evalId)}
           onAddActivity={activity=>addActivity(viewDeal.id,activity)}
@@ -1681,6 +1731,7 @@ function AppInner(){
 
       {modal?.type==="company"&&<Modal title={modal.data.id?t.editCompany:t.newCompanyTitle} onClose={()=>setModal(null)}><CoForm init={modal.data} t={t} onSave={saveCo} onClose={()=>setModal(null)}/></Modal>}
       {modal?.type==="contact"&&<Modal title={modal.data.id?t.editContact:t.newContactTitle} onClose={()=>setModal(null)}><CtForm init={modal.data} cos={cos} t={t} onSave={saveCt} onClose={()=>setModal(null)}/></Modal>}
+      {modal?.type==="user"&&<Modal title={modal.data.id?t.editUser:t.newUserTitle} onClose={()=>setModal(null)}><UsrForm init={modal.data} t={t} onSave={saveUsr} onClose={()=>setModal(null)}/></Modal>}
       {modal?.type==="deal"&&<Modal title={modal.data.id?t.editDeal:t.newDealTitle} onClose={()=>setModal(null)}><DlForm init={modal.data} cos={cos} cts={cts} t={t} lang={lang} currency={currency} stages={stages} onSave={saveDl} onClose={()=>setModal(null)}/></Modal>}
 
       {/* Confirm Delete Dialog */}

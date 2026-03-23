@@ -117,3 +117,19 @@ end $$;
 
 create index if not exists idx_deal_activities_deal on deal_activities(deal_id);
 create index if not exists idx_deal_activities_due  on deal_activities(due_date);
+
+-- 7. Users for task assignment
+create table if not exists crm_users (
+  id         text primary key default gen_random_uuid()::text,
+  name       text not null,
+  alias      text not null,
+  email      text not null,
+  created_at timestamptz default now()
+);
+
+alter table crm_users enable row level security;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='crm_users' and policyname='allow_all_crm_users') then
+    create policy "allow_all_crm_users" on crm_users for all using (true) with check (true);
+  end if;
+end $$;
