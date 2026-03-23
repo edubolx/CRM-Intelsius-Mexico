@@ -444,27 +444,6 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
   }
 }
 
-// ---- localStorage fallback ----
-function lsGet(fallback=null) {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    return {
-      co: p.co || fallback?.co || [],
-      ct: p.ct || fallback?.ct || [],
-      dl: p.dl || fallback?.dl || [],
-      users: p.users || fallback?.users || [],
-      currency: p.currency || fallback?.currency || "USD",
-      stages: p.stages || fallback?.stages || DEFAULT_STAGES,
-    };
-  } catch {}
-  return null;
-}
-function lsSave(data) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); return true; } catch { return false; }
-}
-
 // ---- Unified API ----
 async function storageGet(fallback) {
   const sbData = await supabaseLoad();
@@ -480,16 +459,22 @@ async function storageGet(fallback) {
     };
   }
 
-  const local = lsGet(fallback);
-  if (local) return { ...local, __source: "local" };
-
-  return { ...fallback, __source: "sample" };
+  // Safety-first: never auto-load sample/local data into the live app,
+  // so we avoid accidental overwrites of real database content.
+  return {
+    co: [],
+    ct: [],
+    dl: [],
+    users: fallback.users || [],
+    currency: "USD",
+    stages: fallback.stages || DEFAULT_STAGES,
+    __source: "empty",
+  };
 }
 
 async function storageSave(data) {
   const sbOk = await supabaseSaveAll({ cos: data.co, cts: data.ct, dls: data.dl, stages: data.stages, users: data.users || [] });
-  if (!sbOk) lsSave(data);
-  return true;
+  return sbOk;
 }
 
 // ─── Sample data ──────────────────────────────────────────────────────────────
@@ -537,8 +522,8 @@ function CRMProvider({ children }) {
     (async()=>{
       const loaded = await storageGet(SAMPLE_DATA);
       if(!cancelled){
-        // Safety: if Supabase exists but we only loaded sample data, block autosave to avoid overwriting real DB by accident.
-        canAutoSave.current = !(supabase && loaded.__source === "sample");
+        // Save is allowed only when initial load came from Supabase.
+        canAutoSave.current = loaded.__source === "supabase";
         dispatch({ type:"LOAD", payload:{ cos:loaded.co, cts:loaded.ct, dls:loaded.dl, users:loaded.users||[], currency:loaded.currency||"USD", stages:loaded.stages||DEFAULT_STAGES }});
         setLoading(false);
         setTimeout(()=>{ initialLoadDone.current = true; }, 50);
