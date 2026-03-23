@@ -422,12 +422,16 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
         // Activity deletes are handled explicitly when user clicks delete.
       } catch {}
     }
-    // Upsert users
+    // Upsert users (best-effort so it never blocks deal/contact saves)
     if ((users || []).length > 0) {
-      await supabase.from('crm_users').upsert(
-        users.map(({id,name,alias,email})=>({id,name,alias,email})),
-        { onConflict: 'id' }
-      );
+      try {
+        await supabase.from('crm_users').upsert(
+          users.map(({id,name,alias,email})=>({id,name,alias,email})),
+          { onConflict: 'id' }
+        );
+      } catch (e) {
+        console.warn('crm_users upsert skipped:', e?.message || e);
+      }
     }
 
     // Upsert stages
