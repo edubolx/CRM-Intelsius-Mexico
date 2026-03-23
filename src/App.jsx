@@ -36,6 +36,8 @@ const T = {
     activityStatus:"Estado",
     activityComment:"Comentario",
     addActivity:"Nueva actividad",
+    activityEdit:"Editar actividad",
+    activityUpdate:"Guardar cambios",
     noActivities:"Sin actividades todavía.",
     pending:"Pendiente",
     inProgress:"En progreso",
@@ -117,6 +119,8 @@ const T = {
     activityStatus:"Status",
     activityComment:"Comment",
     addActivity:"New activity",
+    activityEdit:"Edit activity",
+    activityUpdate:"Save changes",
     noActivities:"No activities yet.",
     pending:"Pending",
     inProgress:"In progress",
@@ -1049,24 +1053,38 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
   );
 }
 
-function ActivitiesPanel({deal,t,onAddActivity,onDeleteActivity,onUpdateActivityStatus}){
-  const [form, setForm] = useState({
-    type:"task",
-    title:"",
-    dueDate:today(),
-    responsible:"",
-    status:"pending",
-    comment:"",
-  });
+function ActivitiesPanel({deal,t,onAddActivity,onDeleteActivity,onUpdateActivityStatus,onUpdateActivity}){
+  const emptyForm = { type:"task", title:"", dueDate:today(), responsible:"", status:"pending", comment:"" };
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
   const setF = (k,v) => setForm(p=>({...p,[k]:v}));
 
   const typeOpts = ACTIVITY_TYPES.map(v=>({v,l:t[v]}));
   const statusOpts = ACTIVITY_STATUSES.map(v=>({v,l:t[v]}));
 
-  const handleAdd = () => {
+  const resetForm = () => { setForm(emptyForm); setEditingId(null); };
+
+  const handleSave = () => {
     if(!form.title?.trim()) return;
+    if(editingId){
+      onUpdateActivity(editingId, {...form, title: form.title.trim()});
+      resetForm();
+      return;
+    }
     onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: new Date().toISOString() });
     setForm(p=>({...p,title:"",comment:"",status:"pending"}));
+  };
+
+  const startEdit = (a) => {
+    setEditingId(a.id);
+    setForm({
+      type:a.type||"task",
+      title:a.title||"",
+      dueDate:a.dueDate||today(),
+      responsible:a.responsible||"",
+      status:a.status||"pending",
+      comment:a.comment||"",
+    });
   };
 
   return (
@@ -1079,8 +1097,9 @@ function ActivitiesPanel({deal,t,onAddActivity,onDeleteActivity,onUpdateActivity
         <Sel label={t.activityStatus} value={form.status} onChange={e=>setF("status",e.target.value)} opts={statusOpts}/>
       </div>
       <Txta label={t.activityComment} value={form.comment} onChange={e=>setF("comment",e.target.value)} />
-      <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
-        <Btn ch={<><Ic n="plus" s={12}/>{t.addActivity}</>} onClick={handleAdd}/>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:8}}>
+        {editingId && <Btn v="ghost" ch={t.cancel} onClick={resetForm}/>}        
+        <Btn ch={<><Ic n={editingId?"check":"plus"} s={12}/>{editingId?t.activityUpdate:t.addActivity}</>} onClick={handleSave}/>
       </div>
 
       <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
@@ -1098,6 +1117,7 @@ function ActivitiesPanel({deal,t,onAddActivity,onDeleteActivity,onUpdateActivity
                 <select value={a.status} onChange={e=>onUpdateActivityStatus(a.id,e.target.value)} style={{...iSx,padding:"3px 6px",fontSize:11,width:120}}>
                   {statusOpts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
                 </select>
+                <button title={t.activityEdit} onClick={()=>startEdit(a)} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:2}}><Ic n="edit" s={12}/></button>
                 <button title={t.deleteBtn} onClick={()=>onDeleteActivity(a.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:2}}><Ic n="trash" s={12}/></button>
               </div>
             </div>
@@ -1184,7 +1204,7 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
 }
 
 // ─── Deal Detail Modal ────────────────────────────────────────────────────────
-function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval, onDeleteEval, onAddActivity, onDeleteActivity, onUpdateActivityStatus, onEditDeal, onClose}){
+function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval, onDeleteEval, onAddActivity, onDeleteActivity, onUpdateActivityStatus, onUpdateActivity, onEditDeal, onClose}){
   const [tab, setTab] = useState(deal._openTab || "meddic");
   const co = cos.find(c=>c.id===deal.companyId);
   const ct = cts.find(c=>c.id===deal.contactId);
@@ -1237,6 +1257,7 @@ function DealDetailModal({deal, cos, cts, lang, currency, stages, t, onSaveEval,
           onAddActivity={onAddActivity}
           onDeleteActivity={onDeleteActivity}
           onUpdateActivityStatus={onUpdateActivityStatus}
+          onUpdateActivity={onUpdateActivity}
         />
       )}
     </Modal>
@@ -1513,6 +1534,11 @@ function AppInner(){
     setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?{...a,status}:a)}:p);
   };
 
+  const updateActivity=(dealId, activityId, patch)=>{
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?{...a,...patch}:a)}:d));
+    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?{...a,...patch}:a)}:p);
+  };
+
   const openDealActivities=(dealId)=>{
     const d = dls.find(x=>x.id===dealId);
     if(!d) return;
@@ -1650,6 +1676,7 @@ function AppInner(){
           onAddActivity={activity=>addActivity(viewDeal.id,activity)}
           onDeleteActivity={activityId=>deleteActivity(viewDeal.id,activityId)}
           onUpdateActivityStatus={(activityId,status)=>updateActivityStatus(viewDeal.id,activityId,status)}
+          onUpdateActivity={(activityId,patch)=>updateActivity(viewDeal.id,activityId,patch)}
           onEditDeal={()=>{setModal({type:"deal",data:viewDeal});setViewDeal(null);}}
           onClose={()=>setViewDeal(null)}/>
       )}
