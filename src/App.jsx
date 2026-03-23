@@ -344,6 +344,7 @@ async function supabaseLoad() {
           status: a.status,
           comment: a.comment || "",
           createdAt: a.created_at,
+          updatedAt: a.updated_at,
         })),
     }));
 
@@ -412,6 +413,7 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
             responsible: a.responsible || "",
             status: a.status || "pending",
             comment: a.comment || "",
+            created_at: a.createdAt || null,
           }))
         );
         if (allActivities.length > 0) {
@@ -1089,7 +1091,8 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
       resetForm();
       return;
     }
-    onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: new Date().toISOString() });
+    const nowIso = new Date().toISOString();
+    onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: nowIso, updatedAt: nowIso, completedAt: form.status === "done" ? nowIso : null });
     setForm(p=>({...p,title:"",comment:"",status:"pending"}));
   };
 
@@ -1159,10 +1162,20 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
   const weekStart = startOfWeek(now);
   const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate()+7);
 
+  const parseDateSafe = (v) => {
+    if (!v) return null;
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00`) : new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const inCurrentWeek = (v) => {
+    const d = parseDateSafe(v);
+    return !!d && d >= weekStart && d < weekEnd;
+  };
+
   const pending = all.filter(a=>a.status!=="done");
   const overdue = pending.filter(a=>a.dueDate && a.dueDate < todayS);
   const dueSoon = pending.filter(a=>a.dueDate && a.dueDate >= todayS && a.dueDate <= new Date(now.getTime()+7*86400000).toISOString().slice(0,10));
-  const completedWeek = all.filter(a=>a.status==="done" && a.dueDate && new Date(a.dueDate)>=weekStart && new Date(a.dueDate)<weekEnd);
+  const completedWeek = all.filter(a=>a.status==="done" && [a.completedAt, a.updatedAt, a.createdAt, a.dueDate].some(inCurrentWeek));
 
   const lists = { all, pending, overdue, dueSoon, completedWeek };
   const rows = lists[filter] || all;
@@ -1617,8 +1630,17 @@ function AppInner(){
     }
   };
   const updateActivityStatus=(dealId, activityId, status)=>{
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?{...a,status}:a)}:d));
-    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?{...a,status}:a)}:p);
+    const nowIso = new Date().toISOString();
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>{
+      if(a.id!==activityId) return a;
+      const completedAt = status === "done" ? (a.completedAt || nowIso) : null;
+      return { ...a, status, completedAt, updatedAt: nowIso };
+    })}:d));
+    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>{
+      if(a.id!==activityId) return a;
+      const completedAt = status === "done" ? (a.completedAt || nowIso) : null;
+      return { ...a, status, completedAt, updatedAt: nowIso };
+    })}:p);
   };
 
   const updateActivity=(dealId, activityId, patch)=>{
