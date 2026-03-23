@@ -412,14 +412,9 @@ async function supabaseSaveAll({ cos, cts, dls, stages }) {
         if (allActivities.length > 0) {
           await supabase.from('deal_activities').upsert(allActivities, { onConflict: 'id' });
         }
-        const { data: existingActivities } = await supabase.from('deal_activities').select('id,deal_id');
-        const validActivityIds = new Set(allActivities.map(a=>a.id));
-        const staleActivityIds = (existingActivities || [])
-          .filter(a => validDealIds.has(a.deal_id) && !validActivityIds.has(a.id))
-          .map(a => a.id);
-        if (staleActivityIds.length > 0) {
-          await supabase.from('deal_activities').delete().in('id', staleActivityIds);
-        }
+        // NOTE: avoid auto-deleting "stale" activities from snapshots,
+        // because concurrent tabs/sessions can cause accidental removals.
+        // Activity deletes are handled explicitly when user clicks delete.
       } catch {}
     }
     // Upsert stages
@@ -1528,6 +1523,9 @@ function AppInner(){
   const deleteActivity=(dealId, activityId)=>{
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).filter(a=>a.id!==activityId)}:d));
     setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).filter(a=>a.id!==activityId)}:p);
+    if (supabase) {
+      supabase.from('deal_activities').delete().eq('id', activityId).then(()=>{}).catch(()=>{});
+    }
   };
   const updateActivityStatus=(dealId, activityId, status)=>{
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?{...a,status}:a)}:d));
