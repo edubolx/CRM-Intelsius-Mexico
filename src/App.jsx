@@ -1447,37 +1447,60 @@ function AppInner(){
   const[confirmDel,setConfirmDel]=useState(null);
 
   // ── CRUD operations ──
-  const commitNow = async ({ nextCos=cos, nextCts=cts, nextDls=dls, nextUsers=users, closeModal=true }) => {
+  const withSaveStatus = async (fn) => {
     setSaveStatus("saving");
-    const ok = await storageSave({ co: nextCos, ct: nextCts, dl: nextDls, users: nextUsers, currency, stages });
-    if(!ok){
+    try {
+      await fn();
+      setSaveStatus("saved");
+      setTimeout(()=>setSaveStatus("idle"),1000);
+      return true;
+    } catch (e) {
+      console.error('save op error:', e);
       setSaveStatus("error");
       return false;
     }
-    setCos(nextCos); setCts(nextCts); setDls(nextDls); setUsers(nextUsers);
-    if(closeModal) setModal(null);
-    setSaveStatus("saved");
-    setTimeout(()=>setSaveStatus("idle"),1000);
-    return true;
   };
 
   const saveCo=async f=>{
-    const nextCos = f.id ? cos.map(c=>c.id===f.id?f:c) : [...cos,{...f,id:uid()}];
-    await commitNow({ nextCos });
+    const row = { ...(f.id?f:{...f,id:uid()}) };
+    const ok = await withSaveStatus(async()=>{
+      await supabase.from('companies').upsert([{ id:row.id, name:row.name, industry:row.industry||"", website:row.website||"", phone:row.phone||"", notes:row.notes||"" }], { onConflict:'id' });
+    });
+    if(!ok) return;
+    setCos(p=>f.id?p.map(c=>c.id===row.id?row:c):[...p,row]);
+    setModal(null);
   };
+
   const saveCt=async f=>{
-    const nextCts = f.id ? cts.map(c=>c.id===f.id?f:c) : [...cts,{...f,id:uid()}];
-    await commitNow({ nextCts });
+    const row = { ...(f.id?f:{...f,id:uid()}) };
+    const ok = await withSaveStatus(async()=>{
+      await supabase.from('contacts').upsert([{ id:row.id, name:row.name, email:row.email||"", phone:row.phone||"", title_f:row.titleF||"", linkedin:row.linkedin||"", company_id:row.companyId||null, notes:row.notes||"" }], { onConflict:'id' });
+    });
+    if(!ok) return;
+    setCts(p=>f.id?p.map(c=>c.id===row.id?row:c):[...p,row]);
+    setModal(null);
   };
+
   const saveUsr=async f=>{
-    const nextUsers = f.id ? users.map(u=>u.id===f.id?f:u) : [...users,{...f,id:uid()}];
-    await commitNow({ nextUsers });
+    const row = { ...(f.id?f:{...f,id:uid()}) };
+    const ok = await withSaveStatus(async()=>{
+      await supabase.from('crm_users').upsert([{ id:row.id, name:row.name, alias:row.alias, email:row.email }], { onConflict:'id' });
+    });
+    if(!ok) return;
+    setUsers(p=>f.id?p.map(u=>u.id===row.id?row:u):[...p,row]);
+    setModal(null);
   };
+
   const saveDl=async f=>{
     const base={meddicHistory:[],activities:[]};
-    const nextDls = f.id ? dls.map(d=>d.id===f.id?{...d,...f}:d) : [...dls,{...base,...f,id:uid()}];
-    const ok = await commitNow({ nextDls });
-    if(ok && viewDeal&&viewDeal.id===f.id)setViewDeal(p=>({...p,...f}));
+    const row = f.id ? {...dls.find(d=>d.id===f.id), ...f} : {...base,...f,id:uid()};
+    const ok = await withSaveStatus(async()=>{
+      await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
+    });
+    if(!ok) return;
+    setDls(p=>f.id?p.map(d=>d.id===row.id?row:d):[...p,row]);
+    setModal(null);
+    if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
   };
   const chStage=(id,stage)=>setDls(p=>p.map(d=>d.id===id?{...d,stage}:d));
 
