@@ -1443,15 +1443,37 @@ function AppInner(){
   const[confirmDel,setConfirmDel]=useState(null);
 
   // ── CRUD operations ──
-  const saveCo=f=>{f.id?setCos(p=>p.map(c=>c.id===f.id?f:c)):setCos(p=>[...p,{...f,id:uid()}]);setModal(null);};
-  const saveCt=f=>{f.id?setCts(p=>p.map(c=>c.id===f.id?f:c)):setCts(p=>[...p,{...f,id:uid()}]);setModal(null);};
-  const saveUsr=f=>{f.id?setUsers(p=>p.map(u=>u.id===f.id?f:u)):setUsers(p=>[...p,{...f,id:uid()}]);setModal(null);};
-  const saveDl=f=>{
+  const commitNow = async ({ nextCos=cos, nextCts=cts, nextDls=dls, nextUsers=users, closeModal=true }) => {
+    setSaveStatus("saving");
+    const ok = await storageSave({ co: nextCos, ct: nextCts, dl: nextDls, users: nextUsers, currency, stages });
+    if(!ok){
+      setSaveStatus("error");
+      return false;
+    }
+    setCos(nextCos); setCts(nextCts); setDls(nextDls); setUsers(nextUsers);
+    if(closeModal) setModal(null);
+    setSaveStatus("saved");
+    setTimeout(()=>setSaveStatus("idle"),1000);
+    return true;
+  };
+
+  const saveCo=async f=>{
+    const nextCos = f.id ? cos.map(c=>c.id===f.id?f:c) : [...cos,{...f,id:uid()}];
+    await commitNow({ nextCos });
+  };
+  const saveCt=async f=>{
+    const nextCts = f.id ? cts.map(c=>c.id===f.id?f:c) : [...cts,{...f,id:uid()}];
+    await commitNow({ nextCts });
+  };
+  const saveUsr=async f=>{
+    const nextUsers = f.id ? users.map(u=>u.id===f.id?f:u) : [...users,{...f,id:uid()}];
+    await commitNow({ nextUsers });
+  };
+  const saveDl=async f=>{
     const base={meddicHistory:[],activities:[]};
-    if(f.id){setDls(p=>p.map(d=>d.id===f.id?{...d,...f}:d));}
-    else{setDls(p=>[...p,{...base,...f,id:uid()}]);}
-    setModal(null);
-    if(viewDeal&&viewDeal.id===f.id)setViewDeal(p=>({...p,...f}));
+    const nextDls = f.id ? dls.map(d=>d.id===f.id?{...d,...f}:d) : [...dls,{...base,...f,id:uid()}];
+    const ok = await commitNow({ nextDls });
+    if(ok && viewDeal&&viewDeal.id===f.id)setViewDeal(p=>({...p,...f}));
   };
   const chStage=(id,stage)=>setDls(p=>p.map(d=>d.id===id?{...d,stage}:d));
 
