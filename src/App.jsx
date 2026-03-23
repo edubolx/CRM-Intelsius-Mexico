@@ -445,15 +445,21 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
 }
 
 // ---- localStorage fallback ----
-function lsGet(fallback) {
+function lsGet(fallback=null) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const p = JSON.parse(raw);
-      return { co: p.co || fallback.co, ct: p.ct || fallback.ct, dl: p.dl || fallback.dl, users: p.users || fallback.users, currency: p.currency || fallback.currency, stages: p.stages || fallback.stages };
-    }
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return {
+      co: p.co || fallback?.co || [],
+      ct: p.ct || fallback?.ct || [],
+      dl: p.dl || fallback?.dl || [],
+      users: p.users || fallback?.users || [],
+      currency: p.currency || fallback?.currency || "USD",
+      stages: p.stages || fallback?.stages || DEFAULT_STAGES,
+    };
   } catch {}
-  return fallback;
+  return null;
 }
 function lsSave(data) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); return true; } catch { return false; }
@@ -470,9 +476,14 @@ async function storageGet(fallback) {
       users: sbData.users || fallback.users,
       currency: fallback.currency || "USD",
       stages: sbData.stages || fallback.stages,
+      __source: "supabase",
     };
   }
-  return lsGet(fallback);
+
+  const local = lsGet(fallback);
+  if (local) return { ...local, __source: "local" };
+
+  return { ...fallback, __source: "sample" };
 }
 
 async function storageSave(data) {
@@ -517,7 +528,8 @@ function CRMProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("idle");
   const initialLoadDone = useRef(false);
-  const saveTimer = useRef(null);
+  const canAutoSave = useRef(true);
+  const saveQueue = useRef(Promise.resolve());
 
   // Load
   useEffect(()=>{
@@ -525,6 +537,8 @@ function CRMProvider({ children }) {
     (async()=>{
       const loaded = await storageGet(SAMPLE_DATA);
       if(!cancelled){
+        // Safety: if Supabase exists but we only loaded sample data, block autosave to avoid overwriting real DB by accident.
+        canAutoSave.current = !(supabase && loaded.__source === "sample");
         dispatch({ type:"LOAD", payload:{ cos:loaded.co, cts:loaded.ct, dls:loaded.dl, users:loaded.users||[], currency:loaded.currency||"USD", stages:loaded.stages||DEFAULT_STAGES }});
         setLoading(false);
         setTimeout(()=>{ initialLoadDone.current = true; }, 50);
@@ -533,17 +547,20 @@ function CRMProvider({ children }) {
     return ()=>{ cancelled = true; };
   },[]);
 
-  // Debounced save
+  // Immediate queued save (no debounce): saves right away while serializing writes.
   useEffect(()=>{
     if(!initialLoadDone.current) return;
-    if(saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async()=>{
+    if(!canAutoSave.current) {
+      setSaveStatus("error");
+      return;
+    }
+
+    saveQueue.current = saveQueue.current.then(async()=>{
       setSaveStatus("saving");
       const ok = await storageSave({ co:data.cos, ct:data.cts, dl:data.dls, users:data.users, currency:data.currency, stages:data.stages });
       setSaveStatus(ok?"saved":"error");
-      setTimeout(()=>setSaveStatus("idle"), 2000);
-    }, 500);
-    return ()=>{ if(saveTimer.current) clearTimeout(saveTimer.current); };
+      setTimeout(()=>setSaveStatus("idle"), 1000);
+    }).catch(()=>setSaveStatus("error"));
   },[data]);
 
   const ctx = useMemo(()=>({
