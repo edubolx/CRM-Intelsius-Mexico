@@ -53,6 +53,7 @@ const T = {
     dueSoon:"Por vencer (7 días)",
     completedWeek:"Completadas semana",
     all:"Todas",
+    allResponsibles:"Todos los responsables",
     companyName:"Nombre de empresa", industry:"Industria", website:"Sitio web",
     phone:"Teléfono", notes:"Notas", name:"Nombre", email:"Email",
     titleF:"Cargo / Título", linkedin:"LinkedIn", company:"Empresa",
@@ -138,6 +139,7 @@ const T = {
     dueSoon:"Due in 7 days",
     completedWeek:"Completed this week",
     all:"All",
+    allResponsibles:"All owners",
     companyName:"Company name", industry:"Industry", website:"Website",
     phone:"Phone", notes:"Notes", name:"Name", email:"Email",
     titleF:"Title / Role", linkedin:"LinkedIn", company:"Company",
@@ -303,6 +305,24 @@ const ACTIVITY_TYPES = ["call","emailType","meeting","task","note"];
 const ACTIVITY_STATUSES = ["pending","inProgress","done","blocked"];
 const LEAD_SOURCES = ["LinkedIn","Email marketing","Referido","Llamada en frío","Custom"];
 
+const PROSPECTING_STATUSES = [
+  { value:"nueva", label:{ es:"Nueva", en:"New" } },
+  { value:"en_curso", label:{ es:"En curso", en:"In progress" } },
+  { value:"en_pausa", label:{ es:"En pausa", en:"On hold" } },
+  { value:"no_viable", label:{ es:"No viable", en:"Not viable" } },
+  { value:"convertida_pipeline", label:{ es:"Convertida a pipeline", en:"Converted to pipeline" } },
+];
+
+const PROSPECTING_ACTIVITY_TYPES = [
+  { value:"investigacion", label:{ es:"Investigación", en:"Research" } },
+  { value:"email", label:{ es:"Email", en:"Email" } },
+  { value:"llamada", label:{ es:"Llamada", en:"Call" } },
+  { value:"mensaje", label:{ es:"WhatsApp/Mensaje", en:"Message" } },
+  { value:"linkedin", label:{ es:"LinkedIn", en:"LinkedIn" } },
+  { value:"reunion", label:{ es:"Reunión", en:"Meeting" } },
+  { value:"otro", label:{ es:"Otro", en:"Other" } },
+];
+
 // ─── Storage helpers (Supabase with localStorage fallback) ────────────────────
 const STORAGE_KEY = "crm5_data";
 const uid = () => crypto.randomUUID();
@@ -436,12 +456,23 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
       }
     }
 
-    // Upsert stages
+    // Upsert stages + sync deletes
     if (stages.length > 0) {
       await supabase.from('pipeline_stages').upsert(
         stages.map((s, i) => ({ id: s.id, name: s.name, emoji: s.emoji, bg: s.bg, border: s.border, accent: s.accent, is_won: s.isWon, is_lost: s.isLost, position: i })),
         { onConflict: 'id' }
       );
+
+      // Remove stages deleted in UI so they don't reappear after reload.
+      const { data: existingStages } = await supabase.from('pipeline_stages').select('id');
+      const currentStageIds = new Set(stages.map(s => s.id));
+      const staleStageIds = (existingStages || [])
+        .map(s => s.id)
+        .filter(id => !currentStageIds.has(id));
+
+      if (staleStageIds.length > 0) {
+        await supabase.from('pipeline_stages').delete().in('id', staleStageIds);
+      }
     }
     return true;
   } catch (err) {
@@ -1156,7 +1187,10 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
 
 function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
   const [filter, setFilter] = useState("all");
+  const [responsibleFilter, setResponsibleFilter] = useState("all");
   const all = dls.flatMap(d => (d.activities||[]).map(a=>({...a,dealId:d.id,dealName:d.name})));
+  const responsibleOptions = [...new Set(all.map(a => (a.responsible || "").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const base = responsibleFilter === "all" ? all : all.filter(a => (a.responsible || "").trim() === responsibleFilter);
   const now = new Date();
   const todayS = today();
   const weekStart = startOfWeek(now);
@@ -1172,13 +1206,13 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
     return !!d && d >= weekStart && d < weekEnd;
   };
 
-  const pending = all.filter(a=>a.status!=="done");
+  const pending = base.filter(a=>a.status!=="done");
   const overdue = pending.filter(a=>a.dueDate && a.dueDate < todayS);
   const dueSoon = pending.filter(a=>a.dueDate && a.dueDate >= todayS && a.dueDate <= new Date(now.getTime()+7*86400000).toISOString().slice(0,10));
-  const completedWeek = all.filter(a=>a.status==="done" && [a.completedAt, a.updatedAt, a.createdAt, a.dueDate].some(inCurrentWeek));
+  const completedWeek = base.filter(a=>a.status==="done" && [a.completedAt, a.updatedAt, a.createdAt, a.dueDate].some(inCurrentWeek));
 
-  const lists = { all, pending, overdue, dueSoon, completedWeek };
-  const rows = lists[filter] || all;
+  const lists = { all: base, pending, overdue, dueSoon, completedWeek };
+  const rows = lists[filter] || base;
   const statusOpts = ACTIVITY_STATUSES.map(v=>({v,l:t[v]}));
 
   const cards = [
@@ -1190,13 +1224,21 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
 
   return (
     <div>
-      <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
-        <button onClick={()=>setFilter("all")} style={{background:filter==="all"?"#003e7e":"#ffffff",color:filter==="all"?"#fff":"#4a5a6a",border:"1px solid #b8d8eb",borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{t.all} ({all.length})</button>
+      <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        <button onClick={()=>setFilter("all")} style={{background:filter==="all"?"#003e7e":"#ffffff",color:filter==="all"?"#fff":"#4a5a6a",border:"1px solid #b8d8eb",borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{t.all} ({base.length})</button>
         {cards.map(s=>(
           <button key={s.k} onClick={()=>setFilter(s.k)} style={{background:filter===s.k?s.c+"22":"#ffffff",color:filter===s.k?s.c:"#4a5a6a",border:`1px solid ${filter===s.k?s.c:"#b8d8eb"}`,borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>
             {s.l} ({s.v})
           </button>
         ))}
+        <div style={{marginLeft:"auto",minWidth:220}}>
+          <Sel
+            label={t.activityResponsible}
+            value={responsibleFilter}
+            onChange={e=>setResponsibleFilter(e.target.value)}
+            opts={[{v:"all",l:t.allResponsibles||"All"}, ...responsibleOptions.map(r=>({v:r,l:r}))]}
+          />
+        </div>
       </div>
 
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
@@ -1454,6 +1496,380 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
   );
 });
 
+function ProspectingBoard({ lang, users=[] }) {
+  const [loading, setLoading] = useState(true);
+  const [companies, setCompanies] = useState([]);
+  const [contacts, setContacts] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [activeTab, setActiveTab] = useState("timeline");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null);
+
+  const statusLabel = useCallback((status)=>{
+    const found = PROSPECTING_STATUSES.find(s=>s.value===status);
+    return found ? found.label[lang] : status;
+  },[lang]);
+
+  const activityTypeLabel = useCallback((type)=>{
+    const found = PROSPECTING_ACTIVITY_TYPES.find(s=>s.value===type);
+    return found ? found.label[lang] : type;
+  },[lang]);
+
+  const loadProspecting = useCallback(async()=>{
+    setLoading(true);
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const [{ data:co }, { data:ct }, { data:ac }] = await Promise.all([
+        supabase.from('prospecting_companies').select('*').order('updated_at', { ascending:false }),
+        supabase.from('prospecting_contacts').select('*').order('created_at', { ascending:false }),
+        supabase.from('prospecting_activities').select('*').order('activity_at', { ascending:false }),
+      ]);
+      setCompanies(co||[]);
+      setContacts(ct||[]);
+      setActivities(ac||[]);
+      if (!selectedCompanyId && (co||[]).length) setSelectedCompanyId(co[0].id);
+    } catch (e) {
+      console.warn('Prospecting load skipped:', e?.message || e);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCompanyId]);
+
+  useEffect(()=>{ loadProspecting(); }, [loadProspecting]);
+
+  const ownerOptions = useMemo(()=>{
+    const fromCompanies = companies.map(c=>c.owner_id).filter(Boolean);
+    return [...new Set(fromCompanies)].sort((a,b)=>String(a).localeCompare(String(b)));
+  }, [companies]);
+
+  const filteredCompanies = useMemo(()=>{
+    const q = search.trim().toLowerCase();
+    return companies.filter(c=>{
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+      if (ownerFilter !== 'all' && (c.owner_id || '') !== ownerFilter) return false;
+      if (!q) return true;
+      return (c.name || '').toLowerCase().includes(q);
+    });
+  }, [companies, statusFilter, ownerFilter, search]);
+
+  const selectedCompany = companies.find(c=>c.id===selectedCompanyId) || null;
+  const companyContacts = contacts.filter(c=>c.company_id===selectedCompanyId && !c.is_archived);
+  const companyActivities = activities.filter(a=>a.company_id===selectedCompanyId);
+
+  const upsertCompany = async (payload) => {
+    const row = {
+      id: payload.id || uid(),
+      name: payload.name?.trim(),
+      status: payload.status || 'nueva',
+      owner_id: payload.owner_id || null,
+      industry: payload.industry || null,
+      country: payload.country || null,
+      company_size: payload.company_size || null,
+      lead_source: payload.lead_source || null,
+      priority: payload.priority || null,
+      notes: payload.notes || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (!row.name) return;
+    await supabase.from('prospecting_companies').upsert([row], { onConflict:'id' });
+    await loadProspecting();
+    setSelectedCompanyId(row.id);
+    setModal(null);
+  };
+
+  const upsertContact = async (payload) => {
+    const row = {
+      id: payload.id || uid(),
+      company_id: payload.company_id || selectedCompanyId,
+      name: payload.name?.trim(),
+      title: payload.title || null,
+      email: payload.email || null,
+      phone: payload.phone || null,
+      linkedin_url: payload.linkedin_url || null,
+      notes: payload.notes || null,
+      is_archived: false,
+    };
+    if (!row.company_id || !row.name) return;
+    await supabase.from('prospecting_contacts').upsert([row], { onConflict:'id' });
+    await loadProspecting();
+    setModal(null);
+  };
+
+  const upsertActivity = async (payload) => {
+    const row = {
+      id: payload.id || uid(),
+      company_id: payload.company_id || selectedCompanyId,
+      contact_id: payload.contact_id || null,
+      activity_type: payload.activity_type || 'investigacion',
+      activity_at: payload.activity_at || new Date().toISOString(),
+      outcome: payload.outcome || null,
+      next_step: payload.next_step || null,
+      next_action_at: payload.next_action_at || null,
+      owner_id: payload.owner_id || null,
+      notes: payload.notes || null,
+      attachment_url: payload.attachment_url || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (!row.company_id) return;
+    await supabase.from('prospecting_activities').upsert([row], { onConflict:'id' });
+    await loadProspecting();
+    setModal(null);
+  };
+
+  const deleteCompany = async (companyId) => {
+    const totalContacts = contacts.filter(c=>c.company_id===companyId && !c.is_archived).length;
+    const totalActivities = activities.filter(a=>a.company_id===companyId).length;
+    const ok = window.confirm(`¿Borrar empresa y todo su historial de prospección?\n\nSe eliminarán ${totalContacts} contactos y ${totalActivities} actividades asociadas.`);
+    if (!ok) return;
+    await supabase.from('prospecting_activities').delete().eq('company_id', companyId);
+    await supabase.from('prospecting_contacts').delete().eq('company_id', companyId);
+    await supabase.from('prospecting_companies').delete().eq('id', companyId);
+    await loadProspecting();
+    if (selectedCompanyId === companyId) {
+      const remaining = companies.filter(c=>c.id!==companyId);
+      setSelectedCompanyId(remaining[0]?.id || '');
+      setActiveTab('timeline');
+    }
+  };
+
+  const deleteContact = async (contactId) => {
+    const ct = contacts.find(c=>c.id===contactId);
+    if (!ct) return;
+    const ok = window.confirm(`¿Borrar contacto "${ct.name}"?`);
+    if (!ok) return;
+    await supabase.from('prospecting_activities').update({ contact_id:null }).eq('contact_id', contactId);
+    await supabase.from('prospecting_contacts').delete().eq('id', contactId);
+    await loadProspecting();
+  };
+
+  const deleteActivity = async (activityId) => {
+    const ok = window.confirm('¿Borrar esta actividad de prospección?');
+    if (!ok) return;
+    await supabase.from('prospecting_activities').delete().eq('id', activityId);
+    await loadProspecting();
+  };
+
+  if (loading) return <div style={{padding:20,fontSize:12,color:'#6b7d8e'}}>Cargando prospección...</div>;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <Btn ch={<><Ic n="plus" s={12}/>Empresa</>} onClick={()=>setModal({ type:'company', data:{} })} />
+          <Btn v="subtle" ch={<><Ic n="plus" s={12}/>Actividad</>} onClick={()=>setModal({ type:'activity', data:{ company_id:selectedCompanyId } })} disabled={!selectedCompanyId}/>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <input placeholder="Buscar empresa..." value={search} onChange={e=>setSearch(e.target.value)} style={{...iSx,width:180,padding:'6px 10px'}} />
+          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{...iSx,width:160,padding:'6px 10px'}}>
+            <option value="all">Todos estados</option>
+            {PROSPECTING_STATUSES.map(s=><option key={s.value} value={s.value}>{s.label[lang]}</option>)}
+          </select>
+          <select value={ownerFilter} onChange={e=>setOwnerFilter(e.target.value)} style={{...iSx,width:160,padding:'6px 10px'}}>
+            <option value="all">Todos owners</option>
+            {ownerOptions.map(o=><option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,alignItems:'start'}}>
+        <div style={{background:'#fff',border:'1px solid #c8d6e4',borderRadius:12,overflow:'hidden'}}>
+          <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:8,padding:'10px 12px',fontSize:10,color:'#6b7d8e',fontFamily:"'JetBrains Mono',monospace",textTransform:'uppercase'}}>
+            <div>Empresa</div><div>Estado</div><div>Owner</div><div>Próx. acción</div>
+          </div>
+          <div style={{maxHeight:520,overflowY:'auto'}}>
+            {filteredCompanies.map(c=>{
+              const cActivities = activities.filter(a=>a.company_id===c.id);
+              const nextDate = cActivities.map(a=>a.next_action_at).filter(Boolean).sort()[0] || '—';
+              return (
+                <button key={c.id} onClick={()=>setSelectedCompanyId(c.id)} style={{width:'100%',textAlign:'left',background:selectedCompanyId===c.id?'#eef6ff':'#fff',border:'none',borderTop:'1px solid #edf2f7',padding:'10px 12px',cursor:'pointer'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:8,fontSize:12,color:'#1a2a3a',alignItems:'center'}}>
+                    <div style={{fontWeight:600}}>{c.name}</div>
+                    <div>{statusLabel(c.status)}</div>
+                    <div>{c.owner_id || '—'}</div>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{nextDate ? String(nextDate).slice(0,10) : '—'}</div>
+                  </div>
+                </button>
+              );
+            })}
+            {!filteredCompanies.length && <div style={{padding:16,fontSize:12,color:'#8ea4b8'}}>Sin empresas de prospección.</div>}
+          </div>
+        </div>
+
+        <div style={{background:'#fff',border:'1px solid #c8d6e4',borderRadius:12,minHeight:520,padding:12}}>
+          {!selectedCompany ? (
+            <div style={{fontSize:12,color:'#8ea4b8'}}>Selecciona una empresa para ver detalle.</div>
+          ) : (
+            <>
+              <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'start'}}>
+                <div>
+                  <h3 style={{margin:'0 0 4px',fontSize:18}}>{selectedCompany.name}</h3>
+                  <div style={{display:'flex',gap:8,fontSize:11,color:'#6b7d8e'}}>
+                    <span>{statusLabel(selectedCompany.status)}</span>
+                    <span>•</span>
+                    <span>{selectedCompany.owner_id || 'Sin owner'}</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:6}}>
+                  <Btn v="ghost" ch="Editar" onClick={()=>setModal({ type:'company', data:selectedCompany })}/>
+                  <Btn v="subtle" ch="+ Contacto" onClick={()=>setModal({ type:'contact', data:{ company_id:selectedCompany.id } })}/>
+                  <Btn v="ghost" ch={<><Ic n="trash" s={11}/>Borrar</>} sx={{color:'#ef4444',border:'1px solid #ef444455'}} onClick={()=>deleteCompany(selectedCompany.id)} />
+                </div>
+              </div>
+
+              <div style={{display:'flex',gap:6,marginTop:12,borderBottom:'1px solid #e5edf5'}}>
+                {[{k:'timeline',l:'Timeline'},{k:'contacts',l:'Contactos'},{k:'summary',l:'Resumen'}].map(tb=>(
+                  <button key={tb.k} onClick={()=>setActiveTab(tb.k)} style={{background:'none',border:'none',borderBottom:activeTab===tb.k?'2px solid #003e7e':'2px solid transparent',padding:'8px 10px',cursor:'pointer',fontSize:12,color:activeTab===tb.k?'#003e7e':'#6b7d8e'}}>{tb.l}</button>
+                ))}
+              </div>
+
+              {activeTab==='timeline' && (
+                <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:8,maxHeight:390,overflowY:'auto'}}>
+                  <Btn v="subtle" ch={<><Ic n="plus" s={12}/>Nueva actividad</>} onClick={()=>setModal({ type:'activity', data:{ company_id:selectedCompany.id } })}/>
+                  {companyActivities.map(a=>{
+                    const ctc = contacts.find(c=>c.id===a.contact_id);
+                    return (
+                      <div key={a.id} style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:'10px 11px'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
+                          <div style={{fontSize:12,fontWeight:600}}>{activityTypeLabel(a.activity_type)} {ctc?`· ${ctc.name}`:''}</div>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            <div style={{fontSize:10,color:'#6b7d8e',fontFamily:"'JetBrains Mono',monospace"}}>{String(a.activity_at||'').slice(0,16).replace('T',' ')}</div>
+                            <button title="Borrar actividad" onClick={()=>deleteActivity(a.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:2,opacity:.7}}><Ic n="trash" s={12}/></button>
+                          </div>
+                        </div>
+                        {a.outcome && <div style={{fontSize:11,color:'#4a5a6a',marginTop:4}}>Resultado: {a.outcome}</div>}
+                        {a.next_step && <div style={{fontSize:11,color:'#4a5a6a'}}>Siguiente paso: {a.next_step}</div>}
+                        {a.next_action_at && <div style={{fontSize:11,color:'#4a5a6a'}}>Próxima acción: {String(a.next_action_at).slice(0,10)}</div>}
+                        {a.notes && <div style={{fontSize:11,color:'#6b7d8e',marginTop:4,whiteSpace:'pre-wrap'}}>{a.notes}</div>}
+                      </div>
+                    );
+                  })}
+                  {!companyActivities.length && <div style={{fontSize:12,color:'#8ea4b8'}}>Sin actividades registradas.</div>}
+                </div>
+              )}
+
+              {activeTab==='contacts' && (
+                <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:8,maxHeight:390,overflowY:'auto'}}>
+                  {companyContacts.map(c=>(
+                    <div key={c.id} style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:'10px 11px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}>
+                        <div style={{fontSize:12,fontWeight:600}}>{c.name}</div>
+                        <button title="Borrar contacto" onClick={()=>deleteContact(c.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:2,opacity:.7}}><Ic n="trash" s={12}/></button>
+                      </div>
+                      <div style={{fontSize:11,color:'#5a6b7a'}}>{[c.title,c.email,c.phone].filter(Boolean).join(' · ') || 'Sin datos adicionales'}</div>
+                    </div>
+                  ))}
+                  {!companyContacts.length && <div style={{fontSize:12,color:'#8ea4b8'}}>Sin contactos.</div>}
+                </div>
+              )}
+
+              {activeTab==='summary' && (
+                <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <div style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:10}}>
+                    <div style={{fontSize:10,color:'#6b7d8e',textTransform:'uppercase'}}>Total actividades</div>
+                    <div style={{fontSize:22,fontWeight:700,color:'#003e7e'}}>{companyActivities.length}</div>
+                  </div>
+                  <div style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:10}}>
+                    <div style={{fontSize:10,color:'#6b7d8e',textTransform:'uppercase'}}>Contactos activos</div>
+                    <div style={{fontSize:22,fontWeight:700,color:'#003e7e'}}>{companyContacts.length}</div>
+                  </div>
+                  <div style={{gridColumn:'1 / -1',background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:10,fontSize:12,color:'#4a5a6a'}}>
+                    {selectedCompany.notes || 'Sin notas de empresa.'}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {modal?.type==='company' && (
+        <Modal title={modal.data?.id ? 'Editar empresa de prospección' : 'Nueva empresa de prospección'} onClose={()=>setModal(null)}>
+          <ProspectingCompanyForm lang={lang} init={modal.data} users={users} onSave={upsertCompany} onClose={()=>setModal(null)} />
+        </Modal>
+      )}
+      {modal?.type==='contact' && (
+        <Modal title="Nuevo contacto de prospección" onClose={()=>setModal(null)}>
+          <ProspectingContactForm init={modal.data} onSave={upsertContact} onClose={()=>setModal(null)} />
+        </Modal>
+      )}
+      {modal?.type==='activity' && (
+        <Modal title="Nueva actividad de prospección" onClose={()=>setModal(null)}>
+          <ProspectingActivityForm lang={lang} init={modal.data} contacts={companyContacts} users={users} onSave={upsertActivity} onClose={()=>setModal(null)} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function ProspectingCompanyForm({ init={}, onSave, onClose, lang, users=[] }){
+  const [f, setF] = useState({ name:'', status:'nueva', owner_id:'', industry:'', country:'', company_size:'', lead_source:'', priority:'', notes:'', ...init });
+  const s = k => e => setF(p=>({ ...p, [k]: e.target.value }));
+  return (
+    <>
+      <Inp label="Nombre de empresa *" value={f.name} onChange={s('name')} />
+      <Sel label="Estado" value={f.status} onChange={s('status')} opts={PROSPECTING_STATUSES.map(st=>({ v:st.value, l:st.label[lang] }))} />
+      <Sel label="Owner" value={f.owner_id || ''} onChange={s('owner_id')} opts={[{v:'',l:'— Selecciona —'}, ...users.map(u=>({ v:u.alias || u.name, l:u.alias || u.name }))]} />
+      <Inp label="Industria" value={f.industry || ''} onChange={s('industry')} />
+      <Inp label="País" value={f.country || ''} onChange={s('country')} />
+      <Inp label="Tamaño" value={f.company_size || ''} onChange={s('company_size')} />
+      <Inp label="Origen lead" value={f.lead_source || ''} onChange={s('lead_source')} />
+      <Inp label="Prioridad" value={f.priority || ''} onChange={s('priority')} />
+      <Txta label="Notas" value={f.notes || ''} onChange={s('notes')} />
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+        <Btn v="ghost" ch="Cancelar" onClick={onClose} />
+        <Btn ch="Guardar" onClick={()=>onSave(f)} disabled={!f.name?.trim()} />
+      </div>
+    </>
+  );
+}
+
+function ProspectingContactForm({ init={}, onSave, onClose }){
+  const [f, setF] = useState({ company_id:'', name:'', title:'', email:'', phone:'', linkedin_url:'', notes:'', ...init });
+  const s = k => e => setF(p=>({ ...p, [k]: e.target.value }));
+  return (
+    <>
+      <Inp label="Nombre *" value={f.name} onChange={s('name')} />
+      <Inp label="Cargo" value={f.title || ''} onChange={s('title')} />
+      <Inp label="Email" value={f.email || ''} onChange={s('email')} />
+      <Inp label="Teléfono" value={f.phone || ''} onChange={s('phone')} />
+      <Inp label="LinkedIn" value={f.linkedin_url || ''} onChange={s('linkedin_url')} />
+      <Txta label="Notas" value={f.notes || ''} onChange={s('notes')} />
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+        <Btn v="ghost" ch="Cancelar" onClick={onClose} />
+        <Btn ch="Guardar" onClick={()=>onSave(f)} disabled={!f.name?.trim()} />
+      </div>
+    </>
+  );
+}
+
+function ProspectingActivityForm({ init={}, onSave, onClose, contacts=[], users=[], lang }){
+  const [f, setF] = useState({ company_id:'', contact_id:'', activity_type:'investigacion', activity_at:new Date().toISOString().slice(0,16), outcome:'', next_step:'', next_action_at:'', owner_id:'', notes:'', attachment_url:'', ...init });
+  const s = k => e => setF(p=>({ ...p, [k]: e.target.value }));
+  return (
+    <>
+      <Sel label="Tipo" value={f.activity_type} onChange={s('activity_type')} opts={PROSPECTING_ACTIVITY_TYPES.map(st=>({ v:st.value, l:st.label[lang] }))} />
+      <Sel label="Contacto" value={f.contact_id || ''} onChange={s('contact_id')} opts={[{v:'',l:'Solo empresa'}, ...contacts.map(c=>({ v:c.id, l:c.name }))]} />
+      <Inp label="Fecha/hora" type="datetime-local" value={String(f.activity_at || '').slice(0,16)} onChange={s('activity_at')} />
+      <Inp label="Resultado" value={f.outcome || ''} onChange={s('outcome')} />
+      <Inp label="Siguiente paso" value={f.next_step || ''} onChange={s('next_step')} />
+      <Inp label="Fecha próxima acción" type="date" value={f.next_action_at ? String(f.next_action_at).slice(0,10) : ''} onChange={s('next_action_at')} />
+      <Sel label="Responsable" value={f.owner_id || ''} onChange={s('owner_id')} opts={[{v:'',l:'— Selecciona —'}, ...users.map(u=>({ v:u.alias || u.name, l:u.alias || u.name }))]} />
+      <Inp label="Adjunto/URL" value={f.attachment_url || ''} onChange={s('attachment_url')} />
+      <Txta label="Notas" value={f.notes || ''} onChange={s('notes')} />
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+        <Btn v="ghost" ch="Cancelar" onClick={onClose} />
+        <Btn ch="Guardar" onClick={()=>onSave(f)} />
+      </div>
+    </>
+  );
+}
+
 // ─── App Inner (consumes CRM context) ─────────────────────────────────────────
 function AppInner(){
   const { cos, cts, dls, users, currency, stages, loading, saveStatus, setSaveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages } = useCRM();
@@ -1533,6 +1949,28 @@ function AppInner(){
     if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
   };
   const chStage=(id,stage)=>setDls(p=>p.map(d=>d.id===id?{...d,stage}:d));
+
+  const savePipelineStages = (nextStages) => {
+    // Keep deals visible when a stage is renamed: migrate deal.stage oldName -> newName by stage id.
+    const renameMap = new Map();
+    stages.forEach((prevStage) => {
+      const next = nextStages.find(s => s.id === prevStage.id);
+      if (next && prevStage.name !== next.name) {
+        renameMap.set(prevStage.name, next.name);
+      }
+    });
+
+    if (renameMap.size > 0) {
+      setDls(prevDeals => prevDeals.map(d => (
+        renameMap.has(d.stage) ? { ...d, stage: renameMap.get(d.stage) } : d
+      )));
+      if (viewDeal && renameMap.has(viewDeal.stage)) {
+        setViewDeal(prev => prev ? { ...prev, stage: renameMap.get(prev.stage) } : prev);
+      }
+    }
+
+    setStages(nextStages);
+  };
 
   // ── Delete with confirmation ──
   const requestDelCo=(id)=>{
@@ -1672,7 +2110,7 @@ function AppInner(){
   const fDl=useMemo(()=>dls.filter(d=>d.name.toLowerCase().includes(ql)),[dls,ql]);
   const fUs=useMemo(()=>users.filter(u=>u.name.toLowerCase().includes(ql)||u.alias?.toLowerCase().includes(ql)||u.email?.toLowerCase().includes(ql)),[users,ql]);
 
-  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
+  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
   const addL=tab==="deals"?t.newDeal:tab==="companies"?t.newCompany:tab==="contacts"?t.newContact:tab==="users"?t.newUser:null;
   const addT=tab==="deals"?"deal":tab==="companies"?"company":tab==="contacts"?"contact":tab==="users"?"user":null;
 
@@ -1778,6 +2216,9 @@ function AppInner(){
               {fCt.length===0&&<div style={{color:"#c8d6e4",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noContacts}</div>}
             </div>
           )}
+          {tab==="prospecting"&&(
+            <ProspectingBoard lang={lang} users={users} />
+          )}
           {tab==="activities"&&(
             <ActivitiesDashboard dls={dls} t={t} onUpdateActivityStatus={updateActivityStatus} onOpenActivity={openDealActivities}/>
           )}
@@ -1830,7 +2271,7 @@ function AppInner(){
       {/* Pipeline Editor */}
       {pipelineEditorOpen&&(
         <PipelineEditor stages={stages} dls={dls} t={t}
-          onSave={s=>setStages(s)} onClose={()=>setPipelineEditorOpen(false)}/>
+          onSave={savePipelineStages} onClose={()=>setPipelineEditorOpen(false)}/>
       )}
     </>
   );
