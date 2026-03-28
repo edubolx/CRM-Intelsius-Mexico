@@ -1668,6 +1668,14 @@ function ProspectingBoard({ lang, users=[] }) {
     await loadProspecting();
   };
 
+  const updateProspectingActivityStatus = async (activityId, status) => {
+    await supabase
+      .from('prospecting_activities')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', activityId);
+    await loadProspecting();
+  };
+
   if (loading) return <div style={{padding:20,fontSize:12,color:'#6b7d8e'}}>Cargando prospección...</div>;
 
   return (
@@ -1747,15 +1755,22 @@ function ProspectingBoard({ lang, users=[] }) {
                   {companyActivities.map(a=>{
                     const ctc = contacts.find(c=>c.id===a.contact_id);
                     return (
-                      <div key={a.id} style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:'10px 11px'}}>
+                      <div key={a.id} onClick={()=>setModal({ type:'activity', data:a })} style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:'10px 11px',cursor:'pointer'}}>
                         <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
                           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <div style={{fontSize:12,fontWeight:600}}>{activityTypeLabel(a.activity_type)} {ctc?`· ${ctc.name}`:''}</div>
-                            <span style={{fontSize:10,padding:'2px 7px',borderRadius:999,border:'1px solid #d6e3f0',background:'#eef4fa',color:'#4a5a6a'}}>{activityStatusLabel(a.status || 'pendiente')}</span>
+                            <select
+                              value={a.status || 'pendiente'}
+                              onClick={e=>e.stopPropagation()}
+                              onChange={e=>updateProspectingActivityStatus(a.id, e.target.value)}
+                              style={{...iSx,width:130,padding:'2px 8px',fontSize:11,height:24,background:'#eef4fa'}}
+                            >
+                              {PROSPECTING_ACTIVITY_STATUSES.map(st=><option key={st.value} value={st.value}>{st.label[lang]}</option>)}
+                            </select>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:6}}>
                             <div style={{fontSize:10,color:'#6b7d8e',fontFamily:"'JetBrains Mono',monospace"}}>{String(a.activity_at||'').slice(0,16).replace('T',' ')}</div>
-                            <button title="Borrar actividad" onClick={()=>deleteActivity(a.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:2,opacity:.7}}><Ic n="trash" s={12}/></button>
+                            <button title="Borrar actividad" onClick={(e)=>{e.stopPropagation(); deleteActivity(a.id);}} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:2,opacity:.7}}><Ic n="trash" s={12}/></button>
                           </div>
                         </div>
                         {a.outcome && <div style={{fontSize:11,color:'#4a5a6a',marginTop:4}}>Resultado: {a.outcome}</div>}
@@ -1815,7 +1830,7 @@ function ProspectingBoard({ lang, users=[] }) {
         </Modal>
       )}
       {modal?.type==='activity' && (
-        <Modal title="Nueva actividad de prospección" onClose={()=>setModal(null)}>
+        <Modal title={modal.data?.id ? 'Editar actividad de prospección' : 'Nueva actividad de prospección'} onClose={()=>setModal(null)}>
           <ProspectingActivityForm lang={lang} init={modal.data} contacts={companyContacts} users={users} onSave={upsertActivity} onClose={()=>setModal(null)} />
         </Modal>
       )}
