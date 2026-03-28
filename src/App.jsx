@@ -1910,6 +1910,7 @@ function AppInner(){
   const[tab,setTab]=useState("deals");
   const[pipelineEditorOpen,setPipelineEditorOpen]=useState(false);
   const[pipelineFontSize,setPipelineFontSize]=useState("medium");
+  const uiZoom = pipelineFontSize==="small" ? 0.92 : pipelineFontSize==="large" ? 1.08 : 1;
   const[q,setQ]=useState("");
   const[modal,setModal]=useState(null);
   const[viewDeal,setViewDeal]=useState(null);
@@ -2208,16 +2209,14 @@ function AppInner(){
               </button>
             ))}
           </div>
-          {tab==="deals"&&(
-            <div style={{padding:"6px 0",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-              <div style={{display:"flex",background:"#f0f4f8",border:"1px solid #b8d8eb",borderRadius:7,overflow:"hidden"}}>
-                {[{k:"small",l:"Pequeño"},{k:"medium",l:"Mediano"},{k:"large",l:"Grande"}].map(o=>(
-                  <button key={o.k} onClick={()=>setPipelineFontSize(o.k)} style={{background:pipelineFontSize===o.k?"#003e7e":"transparent",color:pipelineFontSize===o.k?"#fff":"#6b7d8e",border:"none",padding:"4px 10px",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{o.l}</button>
-                ))}
-              </div>
-              <Btn v="subtle" ch={<><Ic n="edit" s={12}/>{t.pipelineEditor}</>} onClick={()=>setPipelineEditorOpen(true)} sx={{fontSize:11,padding:"5px 12px"}}/>
+          <div style={{padding:"6px 0",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{display:"flex",background:"#f0f4f8",border:"1px solid #b8d8eb",borderRadius:7,overflow:"hidden"}}>
+              {[{k:"small",l:"Pequeño"},{k:"medium",l:"Mediano"},{k:"large",l:"Grande"}].map(o=>(
+                <button key={o.k} onClick={()=>setPipelineFontSize(o.k)} style={{background:pipelineFontSize===o.k?"#003e7e":"transparent",color:pipelineFontSize===o.k?"#fff":"#6b7d8e",border:"none",padding:"4px 10px",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{o.l}</button>
+              ))}
             </div>
-          )}
+            {tab==="deals" && <Btn v="subtle" ch={<><Ic n="edit" s={12}/>{t.pipelineEditor}</>} onClick={()=>setPipelineEditorOpen(true)} sx={{fontSize:11,padding:"5px 12px"}}/>}
+          </div>
           {(tab==="companies"||tab==="contacts")&&(
             <div style={{padding:"6px 0"}}>
               <BulkBar type={tab==="companies"?"company":"contact"} t={t}
@@ -2228,7 +2227,7 @@ function AppInner(){
         </nav>
 
         {/* Content */}
-        <main style={{padding:18}}>
+        <main style={{padding:18,zoom:uiZoom}}>
           {tab==="deals"&&(
             <Kanban deals={fDl} cos={cos} cts={cts} t={t} lang={lang} currency={currency} stages={stages}
               onEdit={d=>setModal({type:"deal",data:d})}
