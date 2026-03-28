@@ -271,7 +271,7 @@ const stageStyle = (stages, stageName) => {
   const s = stages.find(st=>st.name===stageName);
   if(s) return s;
   // fallback for unknown stages
-  return { bg:"#ffffff", border:"#c8d6e4", accent:"#5a6b7a", emoji:"❓", isWon:false, isLost:false };
+  return { bg:"#ffffff", border:"#e2e8f0", accent:"#475569", emoji:"❓", isWon:false, isLost:false };
 };
 
 // ─── Currency system ──────────────────────────────────────────────────────────
@@ -636,32 +636,37 @@ const Ic = ({n,s=15})=>{
 };
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
-const iSx={width:"100%",background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:8,padding:"8px 11px",color:"#1a2a3a",fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"};
-const Lbl=({ch})=><label style={{display:"block",fontSize:10,color:"#6b7d8e",marginBottom:4,letterSpacing:.8,textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace"}}>{ch}</label>;
+const iSx={width:"100%",background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:10,padding:"8px 11px",color:"#0f172a",fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"};
+const Lbl=({ch})=><label style={{display:"block",fontSize:10,color:"#64748b",marginBottom:4,letterSpacing:.8,textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace"}}>{ch}</label>;
 const Fld=({label,children})=><div style={{marginBottom:12}}>{label&&<Lbl ch={label}/>}{children}</div>;
 const Inp=({label,...p})=><Fld label={label}><input {...p} style={{...iSx,...p.style}}/></Fld>;
 const Txta=({label,...p})=><Fld label={label}><textarea {...p} rows={p.rows||3} style={{...iSx,resize:"vertical"}}/></Fld>;
 const Sel=({label,opts,...p})=><Fld label={label}><select {...p} style={{...iSx}}>{opts.map(o=><option key={o.v??o} value={o.v??o}>{o.l??o}</option>)}</select></Fld>;
 const Btn=({ch,onClick,v="primary",sx={},disabled=false})=>{
-  const vs={primary:{background:"#003e7e",color:"#fff",border:"none"},ghost:{background:"transparent",color:"#5a6b7a",border:"1px solid #c8d6e4"},subtle:{background:"#c8d6e4",color:"#4a5a6a",border:"1px solid #8ea4b8"},success:{background:"#16a34a22",color:"#22c55e",border:"1px solid #16a34a44"}};
-  return <button onClick={onClick} disabled={disabled} style={{...vs[v],borderRadius:8,padding:"7px 14px",fontSize:12,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1,transition:"opacity .12s, background .12s",...sx}}>{ch}</button>;
+  const vs={
+    primary:{background:"#003e7e",color:"#fff",border:"1px solid #003e7e"},
+    ghost:{background:"#fff",color:"#334155",border:"1px solid #d9e2ec"},
+    subtle:{background:"#f1f5f9",color:"#334155",border:"1px solid #d9e2ec"},
+    success:{background:"#16a34a1a",color:"#15803d",border:"1px solid #16a34a33"}
+  };
+  return <button onClick={onClick} disabled={disabled} style={{...vs[v],borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:500,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1,transition:"all .15s ease",...sx}}>{ch}</button>;
 };
 
 // ─── Loading Screen ───────────────────────────────────────────────────────────
 function LoadingScreen({lang}){
   const t = T[lang] || T.es;
   return(
-    <div style={{minHeight:"100vh",background:"#f0f4f8",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:20}}>
+    <div style={{minHeight:"100vh",background:"#f5f7fa",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:20}}>
       <div style={{width:48,height:48,background:"linear-gradient(135deg,#003e7e,#27aae1)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#fff",animation:"pulse 1.5s ease-in-out infinite"}}>◆</div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-        <span style={{fontSize:16,fontFamily:"'DM Sans',Arial,sans-serif",color:"#1a2a3a"}}>{t.appName}</span>
-        <span style={{fontSize:12,color:"#6b7d8e",fontFamily:"'JetBrains Mono',monospace"}}>{t.loading}</span>
+        <span style={{fontSize:16,fontFamily:"'Inter',Arial,sans-serif",color:"#0f172a"}}>{t.appName}</span>
+        <span style={{fontSize:12,color:"#64748b",fontFamily:"'JetBrains Mono',monospace"}}>{t.loading}</span>
       </div>
-      <div style={{width:140,height:3,background:"#c8d6e4",borderRadius:3,overflow:"hidden"}}>
+      <div style={{width:140,height:3,background:"#e2e8f0",borderRadius:3,overflow:"hidden"}}>
         <div style={{width:"40%",height:"100%",background:"linear-gradient(90deg,#003e7e,#27aae1)",borderRadius:3,animation:"loadbar 1.2s ease-in-out infinite"}}/>
       </div>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         @keyframes pulse { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(1.08);opacity:.85;} }
         @keyframes loadbar { 0%{transform:translateX(-100%);} 100%{transform:translateX(350%);} }
       `}</style>
@@ -673,7 +678,7 @@ function LoadingScreen({lang}){
 function SaveIndicator({status}){
   if(status==="idle") return null;
   const styles = {
-    saving: { color:"#6b7d8e", text:"..." },
+    saving: { color:"#64748b", text:"..." },
     saved:  { color:"#22c55e", text:"✓" },
     error:  { color:"#ef4444", text:"!" },
   };
@@ -689,10 +694,10 @@ function SaveIndicator({status}){
 function Modal({title,onClose,children,wide=false,extraWide=false}){
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,40,80,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(8px)"}}>
-      <div style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:16,width:extraWide?"min(900px,98vw)":wide?"min(680px,97vw)":"min(490px,96vw)",maxHeight:"94vh",overflowY:"auto",padding:24,boxShadow:"0 16px 48px rgba(0,62,126,.12)"}}>
+      <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:16,width:extraWide?"min(900px,98vw)":wide?"min(680px,97vw)":"min(490px,96vw)",maxHeight:"94vh",overflowY:"auto",padding:24,boxShadow:"0 16px 48px rgba(0,62,126,.12)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-          <h3 style={{margin:0,color:"#1a2a3a",fontFamily:"'DM Sans',Arial,sans-serif",fontSize:18}}>{title}</h3>
-          <button onClick={onClose} style={{background:"none",border:"none",color:"#6b7d8e",cursor:"pointer",padding:3}}><Ic n="x"/></button>
+          <h3 style={{margin:0,color:"#0f172a",fontFamily:"'Inter',Arial,sans-serif",fontSize:18}}>{title}</h3>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer",padding:3}}><Ic n="x"/></button>
         </div>
         {children}
       </div>
@@ -730,24 +735,24 @@ function ConfirmDeleteModal({config, t, onClose}){
           <div style={{width:36,height:36,borderRadius:9,background:"#fde8e8",border:"1px solid #d4a0a0",display:"flex",alignItems:"center",justifyContent:"center",color:"#ef4444",flexShrink:0}}>
             <Ic n="alert" s={18}/>
           </div>
-          <h3 style={{margin:0,color:"#1a2a3a",fontFamily:"'DM Sans',Arial,sans-serif",fontSize:16}}>{t.confirmDelete}</h3>
+          <h3 style={{margin:0,color:"#0f172a",fontFamily:"'Inter',Arial,sans-serif",fontSize:16}}>{t.confirmDelete}</h3>
         </div>
 
         {/* Message */}
         <div style={{background:"#fde8e8",border:"1px solid #d4a0a055",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
-          <div style={{fontSize:13,color:"#1a2a3a",lineHeight:1.6,marginBottom:6}}>{msg}</div>
+          <div style={{fontSize:13,color:"#0f172a",lineHeight:1.6,marginBottom:6}}>{msg}</div>
           {(hasCascade||hasContactDeals) && (
             <div style={{fontSize:12,color:"#f97316",lineHeight:1.5,marginTop:6,padding:"8px 10px",background:"#f9731608",borderRadius:7,border:"1px solid #f9731622"}}>
               {cascadeMsg}
             </div>
           )}
-          <div style={{fontSize:11,color:"#5a6b7a",marginTop:8,fontFamily:"'JetBrains Mono',monospace"}}>{t.actionIrreversible}</div>
+          <div style={{fontSize:11,color:"#475569",marginTop:8,fontFamily:"'JetBrains Mono',monospace"}}>{t.actionIrreversible}</div>
         </div>
 
         {/* Actions */}
         {hasCascade ? (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{fontSize:11,color:"#5a6b7a",marginBottom:2}}>{t.confirmDeleteCascadeOption}</div>
+            <div style={{fontSize:11,color:"#475569",marginBottom:2}}>{t.confirmDeleteCascadeOption}</div>
             <button onClick={()=>{onCascadeDelete();onClose();}}
               style={{...dangerBtn,borderRadius:8,padding:"9px 14px",fontSize:12,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,width:"100%"}}>
               <Ic n="trash" s={13}/>{t.cascadeDeleteAll}
@@ -757,7 +762,7 @@ function ConfirmDeleteModal({config, t, onClose}){
               <Ic n="link" s={13}/>{t.cascadeUnlink}
             </button>
             <button onClick={onClose}
-              style={{background:"transparent",color:"#5a6b7a",border:"1px solid #c8d6e4",borderRadius:8,padding:"9px 14px",fontSize:12,cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+              style={{background:"transparent",color:"#475569",border:"1px solid #e2e8f0",borderRadius:8,padding:"9px 14px",fontSize:12,cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
               {t.cancel}
             </button>
           </div>
@@ -836,31 +841,31 @@ function PipelineEditor({stages, dls, t, onSave, onClose}){
               onDrop={e=>{e.preventDefault();handleDrop(i);}}
               style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:isOver?stage.accent+"15":stage.bg,border:`1px solid ${isOver?stage.accent:stage.border}`,borderRadius:10,cursor:"grab",transition:"all .12s",opacity:dragIdx===i?.4:1}}>
               {/* Drag handle & order */}
-              <div style={{display:"flex",flexDirection:"column",gap:2,color:"#8ea4b8",flexShrink:0,cursor:"grab"}}>
-                <button onClick={()=>move(i,i-1)} disabled={i===0} style={{background:"none",border:"none",color:"#6b7d8e",cursor:i===0?"default":"pointer",padding:0,fontSize:10,opacity:i===0?.3:1}}><Ic n="chevUp" s={10}/></button>
-                <button onClick={()=>move(i,i+1)} disabled={i===draft.length-1} style={{background:"none",border:"none",color:"#6b7d8e",cursor:i===draft.length-1?"default":"pointer",padding:0,fontSize:10,opacity:i===draft.length-1?.3:1}}><Ic n="chevDown" s={10}/></button>
+              <div style={{display:"flex",flexDirection:"column",gap:2,color:"#94a3b8",flexShrink:0,cursor:"grab"}}>
+                <button onClick={()=>move(i,i-1)} disabled={i===0} style={{background:"none",border:"none",color:"#64748b",cursor:i===0?"default":"pointer",padding:0,fontSize:10,opacity:i===0?.3:1}}><Ic n="chevUp" s={10}/></button>
+                <button onClick={()=>move(i,i+1)} disabled={i===draft.length-1} style={{background:"none",border:"none",color:"#64748b",cursor:i===draft.length-1?"default":"pointer",padding:0,fontSize:10,opacity:i===draft.length-1?.3:1}}><Ic n="chevDown" s={10}/></button>
               </div>
               {/* Emoji input */}
               <input value={stage.emoji} onChange={e=>update(i,"emoji",e.target.value)}
-                style={{width:32,background:"transparent",border:"1px solid #c8d6e4",borderRadius:6,textAlign:"center",fontSize:16,padding:"2px 0",color:"#1a2a3a",outline:"none"}}/>
+                style={{width:32,background:"transparent",border:"1px solid #e2e8f0",borderRadius:6,textAlign:"center",fontSize:16,padding:"2px 0",color:"#0f172a",outline:"none"}}/>
               {/* Name input */}
               <input value={stage.name} onChange={e=>update(i,"name",e.target.value)}
                 placeholder={t.stageName}
-                style={{flex:1,background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:6,padding:"6px 9px",color:"#1a2a3a",fontSize:12,fontFamily:"inherit",outline:"none",minWidth:0}}/>
+                style={{flex:1,background:"#f5f7fa",border:"1px solid #e2e8f0",borderRadius:6,padding:"6px 9px",color:"#0f172a",fontSize:12,fontFamily:"inherit",outline:"none",minWidth:0}}/>
               {/* Won/Lost toggles */}
               <button onClick={()=>setWon(i)}
-                style={{background:stage.isWon?"#22c55e22":"transparent",border:`1px solid ${stage.isWon?"#22c55e44":"#c8d6e4"}`,borderRadius:6,padding:"3px 8px",fontSize:10,color:stage.isWon?"#22c55e":"#6b7d8e",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>
+                style={{background:stage.isWon?"#22c55e22":"transparent",border:`1px solid ${stage.isWon?"#22c55e44":"#e2e8f0"}`,borderRadius:6,padding:"3px 8px",fontSize:10,color:stage.isWon?"#22c55e":"#64748b",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>
                 {t.stageWon}
               </button>
               <button onClick={()=>setLost(i)}
-                style={{background:stage.isLost?"#ef444422":"transparent",border:`1px solid ${stage.isLost?"#ef444444":"#c8d6e4"}`,borderRadius:6,padding:"3px 8px",fontSize:10,color:stage.isLost?"#ef4444":"#6b7d8e",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>
+                style={{background:stage.isLost?"#ef444422":"transparent",border:`1px solid ${stage.isLost?"#ef444444":"#e2e8f0"}`,borderRadius:6,padding:"3px 8px",fontSize:10,color:stage.isLost?"#ef4444":"#64748b",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>
                 {t.stageLost}
               </button>
               {/* Deal count badge */}
-              {count>0&&<span style={{fontSize:9,color:"#5a6b7a",background:"#f0f4f8",borderRadius:4,padding:"2px 6px",fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{count} deals</span>}
+              {count>0&&<span style={{fontSize:9,color:"#475569",background:"#f5f7fa",borderRadius:4,padding:"2px 6px",fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{count} deals</span>}
               {/* Delete */}
               <button onClick={()=>canDel&&remove(i)} title={!canDel?t.stageInUse:""}
-                style={{background:"none",border:"none",color:canDel?"#ef4444":"#c8d6e4",cursor:canDel?"pointer":"not-allowed",padding:2,opacity:canDel?.7:.3,flexShrink:0}}>
+                style={{background:"none",border:"none",color:canDel?"#ef4444":"#e2e8f0",cursor:canDel?"pointer":"not-allowed",padding:2,opacity:canDel?.7:.3,flexShrink:0}}>
                 <Ic n="trash" s={12}/>
               </button>
             </div>
@@ -899,7 +904,7 @@ function ScoreRing({score,max=30,size=48,strokeW=4}){
   const c=scoreColor(score,max);
   return(
     <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#c8d6e4" strokeWidth={strokeW}/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={strokeW}/>
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={c} strokeWidth={strokeW}
         strokeDasharray={`${circ*pct} ${circ*(1-pct)}`} strokeLinecap="round"
         style={{transition:"stroke-dasharray .4s ease"}}/>
@@ -917,14 +922,14 @@ function ScoreBar({value, onChange, color}){
     <div style={{display:"flex",gap:4,alignItems:"center"}}>
       {[1,2,3,4,5].map(i=>(
         <button key={i} onClick={()=>onChange(value===i?0:i)}
-          style={{width:26,height:26,borderRadius:6,border:`1px solid ${i<=value?color:"#c8d6e4"}`,
-            background:i<=value?color+"33":"transparent",color:i<=value?color:"#8ea4b8",
+          style={{width:26,height:26,borderRadius:6,border:`1px solid ${i<=value?color:"#e2e8f0"}`,
+            background:i<=value?color+"33":"transparent",color:i<=value?color:"#94a3b8",
             cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",
             transition:"all .12s",display:"flex",alignItems:"center",justifyContent:"center"}}>
           {i}
         </button>
       ))}
-      <span style={{fontSize:10,color:"#6b7d8e",marginLeft:4,fontFamily:"'JetBrains Mono',monospace"}}>{value}/5</span>
+      <span style={{fontSize:10,color:"#64748b",marginLeft:4,fontFamily:"'JetBrains Mono',monospace"}}>{value}/5</span>
     </div>
   );
 }
@@ -960,10 +965,10 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <ScoreRing score={total} size={54}/>
           <div>
-            <div style={{fontSize:11,color:"#6b7d8e",fontFamily:"'JetBrains Mono',monospace",letterSpacing:.8,textTransform:"uppercase",marginBottom:2}}>{t.meddicTotal}</div>
+            <div style={{fontSize:11,color:"#64748b",fontFamily:"'JetBrains Mono',monospace",letterSpacing:.8,textTransform:"uppercase",marginBottom:2}}>{t.meddicTotal}</div>
             <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-              <span style={{fontSize:24,fontWeight:700,color:scoreColor(total),fontFamily:"'DM Sans',Arial,sans-serif"}}>{total}</span>
-              <span style={{fontSize:13,color:"#6b7d8e",fontFamily:"'JetBrains Mono',monospace"}}>{t.meddicMax}</span>
+              <span style={{fontSize:24,fontWeight:700,color:scoreColor(total),fontFamily:"'Inter',Arial,sans-serif"}}>{total}</span>
+              <span style={{fontSize:13,color:"#64748b",fontFamily:"'JetBrains Mono',monospace"}}>{t.meddicMax}</span>
               {delta!==null && delta!==0 && (
                 <span style={{fontSize:11,color:delta>0?"#22c55e":"#ef4444",background:delta>0?"#08240e":"#fde8e8",borderRadius:5,padding:"1px 7px",fontFamily:"'JetBrains Mono',monospace"}}>
                   {delta>0?"+":""}{delta} vs prev
@@ -973,13 +978,13 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
           </div>
         </div>
         <button onClick={()=>setShowHistory(p=>!p)}
-          style={{background:"#c8d6e4",border:"1px solid #8ea4b8",borderRadius:8,padding:"6px 12px",color:"#4a5a6a",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontFamily:"'JetBrains Mono',monospace"}}>
+          style={{background:"#e2e8f0",border:"1px solid #94a3b8",borderRadius:8,padding:"6px 12px",color:"#334155",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontFamily:"'JetBrains Mono',monospace"}}>
           <Ic n="history" s={12}/>{t.meddicHistory} ({deal.meddicHistory?.length||0})
         </button>
       </div>
 
       {/* Progress bar overall */}
-      <div style={{height:4,background:"#c8d6e4",borderRadius:4,marginBottom:20,overflow:"hidden"}}>
+      <div style={{height:4,background:"#e2e8f0",borderRadius:4,marginBottom:20,overflow:"hidden"}}>
         <div style={{height:"100%",background:`linear-gradient(90deg,#003e7e,${scoreColor(total)})`,width:`${(total/30)*100}%`,borderRadius:4,transition:"width .4s ease"}}/>
       </div>
 
@@ -991,27 +996,27 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
           const val  = draft.meddic[k] || {score:0,notes:""};
           const isExp = expandedKey === k;
           return(
-            <div key={k} style={{background:"#f0f4f8",border:`1px solid ${isExp?meta.color+"55":"#c8d6e4"}`,borderRadius:11,overflow:"hidden",transition:"border-color .15s"}}>
+            <div key={k} style={{background:"#f5f7fa",border:`1px solid ${isExp?meta.color+"55":"#e2e8f0"}`,borderRadius:11,overflow:"hidden",transition:"border-color .15s"}}>
               <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",cursor:"pointer"}}
                 onClick={()=>setExpandedKey(isExp?null:k)}>
                 <div style={{width:32,height:32,borderRadius:8,background:meta.color+"22",border:`1px solid ${meta.color}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  <span style={{fontSize:14,fontWeight:700,color:meta.color,fontFamily:"'DM Sans',Arial,sans-serif"}}>{meta.letter}</span>
+                  <span style={{fontSize:14,fontWeight:700,color:meta.color,fontFamily:"'Inter',Arial,sans-serif"}}>{meta.letter}</span>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                    <span style={{fontSize:12,fontWeight:600,color:"#1a2a3a"}}>{info.name}</span>
-                    {val.notes && <span style={{fontSize:9,color:"#6b7d8e",fontFamily:"'JetBrains Mono',monospace",background:"#c8d6e4",borderRadius:4,padding:"1px 5px"}}>nota</span>}
+                    <span style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{info.name}</span>
+                    {val.notes && <span style={{fontSize:9,color:"#64748b",fontFamily:"'JetBrains Mono',monospace",background:"#e2e8f0",borderRadius:4,padding:"1px 5px"}}>nota</span>}
                   </div>
-                  <div style={{fontSize:10,color:"#6b7d8e",lineHeight:1.4}}>{info.desc}</div>
+                  <div style={{fontSize:10,color:"#64748b",lineHeight:1.4}}>{info.desc}</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                   <div style={{display:"flex",gap:2}}>
                     {[1,2,3,4,5].map(i=>(
-                      <div key={i} style={{width:6,height:16,borderRadius:2,background:i<=val.score?meta.color:"#c8d6e4",transition:"background .12s"}}/>
+                      <div key={i} style={{width:6,height:16,borderRadius:2,background:i<=val.score?meta.color:"#e2e8f0",transition:"background .12s"}}/>
                     ))}
                   </div>
                   <span style={{fontSize:11,fontWeight:700,color:meta.color,fontFamily:"'JetBrains Mono',monospace",minWidth:14,textAlign:"right"}}>{val.score}</span>
-                  <span style={{color:"#8ea4b8",marginLeft:2}}><Ic n={isExp?"chevUp":"chevDown"} s={12}/></span>
+                  <span style={{color:"#94a3b8",marginLeft:2}}><Ic n={isExp?"chevUp":"chevDown"} s={12}/></span>
                 </div>
               </div>
 
@@ -1034,7 +1039,7 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
       </div>
 
       {/* Save evaluation */}
-      <div style={{display:"flex",gap:10,alignItems:"center",marginTop:16,paddingTop:14,borderTop:"1px solid #c8d6e4"}}>
+      <div style={{display:"flex",gap:10,alignItems:"center",marginTop:16,paddingTop:14,borderTop:"1px solid #e2e8f0"}}>
         <Fld label={t.meddicDate} style={{margin:0}}>
           <input type="date" value={draft.date} onChange={e=>setDraft(p=>({...p,date:e.target.value}))}
             style={{...iSx,width:150}}/>
@@ -1050,10 +1055,10 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
 
       {/* History */}
       {showHistory && (
-        <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid #c8d6e4"}}>
-          <div style={{fontSize:12,fontWeight:600,color:"#4a5a6a",marginBottom:10,fontFamily:"'JetBrains Mono',monospace",letterSpacing:.5}}>{t.meddicHistory}</div>
+        <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid #e2e8f0"}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#334155",marginBottom:10,fontFamily:"'JetBrains Mono',monospace",letterSpacing:.5}}>{t.meddicHistory}</div>
           {(!deal.meddicHistory || deal.meddicHistory.length===0) && (
-            <div style={{fontSize:11,color:"#8ea4b8",fontFamily:"'JetBrains Mono',monospace"}}>{t.meddicNoHistory}</div>
+            <div style={{fontSize:11,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace"}}>{t.meddicNoHistory}</div>
           )}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {[...(deal.meddicHistory||[])].reverse().map((ev,i)=>{
@@ -1062,9 +1067,9 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
               const prevTot=prev?calcTotal(prev.meddic):null;
               const d=prevTot!==null?tot-prevTot:null;
               return(
-                <div key={ev.id} style={{background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:10,padding:"10px 12px"}}>
+                <div key={ev.id} style={{background:"#f5f7fa",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 12px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <span style={{fontSize:11,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>{ev.date}</span>
+                    <span style={{fontSize:11,color:"#475569",fontFamily:"'JetBrains Mono',monospace"}}>{ev.date}</span>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       {d!==null&&d!==0&&<span style={{fontSize:10,color:d>0?"#22c55e":"#ef4444",fontFamily:"'JetBrains Mono',monospace"}}>{d>0?"+":""}{d}</span>}
                       <ScoreRing score={tot} size={36} strokeW={3}/>
@@ -1082,8 +1087,8 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
                       const meta=MEDDIC_META[k];
                       const s=ev.meddic[k]?.score||0;
                       return(
-                        <div key={k} style={{display:"flex",alignItems:"center",gap:4,background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:6,padding:"3px 8px"}}>
-                          <span style={{fontSize:10,fontWeight:700,color:meta.color,fontFamily:"'DM Sans',Arial,sans-serif"}}>{meta.letter}</span>
+                        <div key={k} style={{display:"flex",alignItems:"center",gap:4,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:6,padding:"3px 8px"}}>
+                          <span style={{fontSize:10,fontWeight:700,color:meta.color,fontFamily:"'Inter',Arial,sans-serif"}}>{meta.letter}</span>
                           <span style={{fontSize:10,color:meta.color,fontFamily:"'JetBrains Mono',monospace"}}>{s}</span>
                         </div>
                       );
@@ -1094,7 +1099,7 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
                       const meta=MEDDIC_META[k];
                       const info=meta[lang]||meta.es;
                       return(
-                        <div key={k} style={{fontSize:10,color:"#5a6b7a",lineHeight:1.4}}>
+                        <div key={k} style={{fontSize:10,color:"#475569",lineHeight:1.4}}>
                           <span style={{color:meta.color,fontWeight:600}}>{info.name}: </span>
                           {ev.meddic[k].notes}
                         </div>
@@ -1163,14 +1168,14 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
 
       <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
         {(!(deal.activities||[]).length) && (
-          <div style={{fontSize:11,color:"#8ea4b8",fontFamily:"'JetBrains Mono',monospace"}}>{t.noActivities}</div>
+          <div style={{fontSize:11,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace"}}>{t.noActivities}</div>
         )}
         {[...(deal.activities||[])].sort((a,b)=>(a.dueDate||"").localeCompare(b.dueDate||"")).map(a=>(
-          <div key={a.id} style={{background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:10,padding:"9px 10px"}}>
+          <div key={a.id} style={{background:"#f5f7fa",border:"1px solid #e2e8f0",borderRadius:10,padding:"9px 10px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
               <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
-                <span style={{fontSize:12,fontWeight:600,color:"#1a2a3a"}}>{a.title}</span>
+                <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
+                <span style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{a.title}</span>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <select value={a.status} onChange={e=>onUpdateActivityStatus(a.id,e.target.value)} style={{...iSx,padding:"3px 6px",fontSize:11,width:120}}>
@@ -1181,10 +1186,10 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
               </div>
             </div>
             <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
-              {a.dueDate && <span style={{fontSize:10,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>📅 {a.dueDate}</span>}
-              {a.responsible && <span style={{fontSize:10,color:"#5a6b7a"}}>👤 {a.responsible}</span>}
+              {a.dueDate && <span style={{fontSize:10,color:"#475569",fontFamily:"'JetBrains Mono',monospace"}}>📅 {a.dueDate}</span>}
+              {a.responsible && <span style={{fontSize:10,color:"#475569"}}>👤 {a.responsible}</span>}
             </div>
-            {a.comment && <div style={{fontSize:11,color:"#6b7d8e",marginTop:4,lineHeight:1.5}}>{a.comment}</div>}
+            {a.comment && <div style={{fontSize:11,color:"#64748b",marginTop:4,lineHeight:1.5}}>{a.comment}</div>}
           </div>
         ))}
       </div>
@@ -1232,9 +1237,9 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
   return (
     <div>
       <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        <button onClick={()=>setFilter("all")} style={{background:filter==="all"?"#003e7e":"#ffffff",color:filter==="all"?"#fff":"#4a5a6a",border:"1px solid #b8d8eb",borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{t.all} ({base.length})</button>
+        <button onClick={()=>setFilter("all")} style={{background:filter==="all"?"#003e7e":"#ffffff",color:filter==="all"?"#fff":"#334155",border:"1px solid #d9e2ec",borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{t.all} ({base.length})</button>
         {cards.map(s=>(
-          <button key={s.k} onClick={()=>setFilter(s.k)} style={{background:filter===s.k?s.c+"22":"#ffffff",color:filter===s.k?s.c:"#4a5a6a",border:`1px solid ${filter===s.k?s.c:"#b8d8eb"}`,borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>
+          <button key={s.k} onClick={()=>setFilter(s.k)} style={{background:filter===s.k?s.c+"22":"#ffffff",color:filter===s.k?s.c:"#334155",border:`1px solid ${filter===s.k?s.c:"#d9e2ec"}`,borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>
             {s.l} ({s.v})
           </button>
         ))}
@@ -1250,34 +1255,34 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
 
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         {cards.map(s=>(
-          <div key={s.k} style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:"10px 16px",flex:1,minWidth:130}}>
-            <div style={{fontSize:10,color:"#6b7d8e",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
-            <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'DM Sans',Arial,sans-serif"}}>{s.v}</div>
+          <div key={s.k} style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:12,padding:"10px 16px",flex:1,minWidth:130}}>
+            <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
+            <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'Inter',Arial,sans-serif"}}>{s.v}</div>
           </div>
         ))}
       </div>
 
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {rows.map(a=>(
-          <div key={a.id} onClick={()=>onOpenActivity(a.dealId)} style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:10,padding:"10px 12px",cursor:"pointer"}}>
+          <div key={a.id} onClick={()=>onOpenActivity(a.dealId)} style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 12px",cursor:"pointer"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
               <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
-                <span style={{fontSize:12,fontWeight:600,color:"#1a2a3a"}}>{a.title}</span>
-                <span style={{fontSize:10,color:"#003e7e",fontFamily:"'JetBrains Mono',monospace",background:"#eaf3ff",border:"1px solid #b8d8eb",borderRadius:5,padding:"2px 6px"}}>Deal: {a.dealName}</span>
+                <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#f5f7fa",border:"1px solid #e2e8f0",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
+                <span style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{a.title}</span>
+                <span style={{fontSize:10,color:"#003e7e",fontFamily:"'JetBrains Mono',monospace",background:"#eaf3ff",border:"1px solid #d9e2ec",borderRadius:5,padding:"2px 6px"}}>Deal: {a.dealName}</span>
               </div>
               <select value={a.status} onClick={e=>e.stopPropagation()} onChange={e=>onUpdateActivityStatus(a.dealId,a.id,e.target.value)} style={{...iSx,padding:"3px 6px",fontSize:11,width:140}}>
                 {statusOpts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
             </div>
             <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
-              {a.dueDate && <span style={{fontSize:10,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>📅 {a.dueDate}</span>}
-              {a.responsible && <span style={{fontSize:10,color:"#5a6b7a"}}>👤 {a.responsible}</span>}
+              {a.dueDate && <span style={{fontSize:10,color:"#475569",fontFamily:"'JetBrains Mono',monospace"}}>📅 {a.dueDate}</span>}
+              {a.responsible && <span style={{fontSize:10,color:"#475569"}}>👤 {a.responsible}</span>}
             </div>
-            {a.comment && <div style={{fontSize:11,color:"#6b7d8e",marginTop:4,lineHeight:1.5}}>{a.comment}</div>}
+            {a.comment && <div style={{fontSize:11,color:"#64748b",marginTop:4,lineHeight:1.5}}>{a.comment}</div>}
           </div>
         ))}
-        {!rows.length && <div style={{fontSize:11,color:"#8ea4b8"}}>{t.noActivities}</div>}
+        {!rows.length && <div style={{fontSize:11,color:"#94a3b8"}}>{t.noActivities}</div>}
       </div>
     </div>
   );
@@ -1294,26 +1299,26 @@ function DealDetailModal({deal, cos, cts, users, lang, currency, stages, t, onSa
 
   return(
     <Modal title={deal.name} onClose={onClose} extraWide>
-      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:18,padding:"12px 14px",background:"#f0f4f8",borderRadius:10,border:"1px solid #c8d6e4"}}>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:18,padding:"12px 14px",background:"#f5f7fa",borderRadius:10,border:"1px solid #e2e8f0"}}>
         <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12}}>
           <span style={{fontSize:13}}>{m.emoji}</span>
           <span style={{color:m.accent,fontWeight:600,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{deal.stage}</span>
         </div>
-        <div style={{color:"#8ea4b8"}}>·</div>
-        <div style={{fontSize:14,fontWeight:700,color:m.accent,fontFamily:"'DM Sans',Arial,sans-serif"}}>{fv(deal.value,currency)}</div>
-        {co&&<><div style={{color:"#8ea4b8"}}>·</div><div style={{fontSize:12,color:"#5a6b7a"}}>🏢 {co.name}</div></>}
-        {ct&&<><div style={{color:"#8ea4b8"}}>·</div><div style={{fontSize:12,color:"#5a6b7a"}}>👤 {ct.name}</div></>}
-        {deal.closingDate&&<><div style={{color:"#8ea4b8"}}>·</div><div style={{fontSize:11,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>{t.closing}: {deal.closingDate}</div></>}
-        {(deal.leadSource || deal.leadSourceCustom) && <><div style={{color:"#8ea4b8"}}>·</div><div style={{fontSize:11,color:"#5a6b7a",fontFamily:"'JetBrains Mono',monospace"}}>{t.leadSource}: {deal.leadSource==="Custom"?(deal.leadSourceCustom||"Custom"):deal.leadSource}</div></>}
+        <div style={{color:"#94a3b8"}}>·</div>
+        <div style={{fontSize:14,fontWeight:700,color:m.accent,fontFamily:"'Inter',Arial,sans-serif"}}>{fv(deal.value,currency)}</div>
+        {co&&<><div style={{color:"#94a3b8"}}>·</div><div style={{fontSize:12,color:"#475569"}}>🏢 {co.name}</div></>}
+        {ct&&<><div style={{color:"#94a3b8"}}>·</div><div style={{fontSize:12,color:"#475569"}}>👤 {ct.name}</div></>}
+        {deal.closingDate&&<><div style={{color:"#94a3b8"}}>·</div><div style={{fontSize:11,color:"#475569",fontFamily:"'JetBrains Mono',monospace"}}>{t.closing}: {deal.closingDate}</div></>}
+        {(deal.leadSource || deal.leadSourceCustom) && <><div style={{color:"#94a3b8"}}>·</div><div style={{fontSize:11,color:"#475569",fontFamily:"'JetBrains Mono',monospace"}}>{t.leadSource}: {deal.leadSource==="Custom"?(deal.leadSourceCustom||"Custom"):deal.leadSource}</div></>}
         <div style={{marginLeft:"auto"}}>
           <Btn ch={<><Ic n="edit" s={11}/>{t.editDeal}</>} v="subtle" sx={{fontSize:11,padding:"4px 10px"}} onClick={onEditDeal}/>
         </div>
       </div>
 
-      <div style={{display:"flex",gap:2,marginBottom:18,borderBottom:"1px solid #c8d6e4"}}>
+      <div style={{display:"flex",gap:2,marginBottom:18,borderBottom:"1px solid #e2e8f0"}}>
         {[{k:"meddic",l:"MEDDIC",icon:"meddic"},{k:"notes",l:t.notes,icon:"edit"},{k:"activities",l:t.activities,icon:"history"}].map(tb=>(
           <button key={tb.k} onClick={()=>setTab(tb.k)}
-            style={{background:"none",border:"none",borderBottom:`2px solid ${tab===tb.k?"#003e7e":"transparent"}`,padding:"8px 14px",color:tab===tb.k?"#27aae1":"#6b7d8e",fontFamily:"inherit",fontSize:12,fontWeight:tab===tb.k?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+            style={{background:"none",border:"none",borderBottom:`2px solid ${tab===tb.k?"#003e7e":"transparent"}`,padding:"8px 14px",color:tab===tb.k?"#27aae1":"#64748b",fontFamily:"inherit",fontSize:12,fontWeight:tab===tb.k?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
             <Ic n={tb.icon} s={12}/>{tb.l}
             {tb.k==="meddic" && latestMeddic && (
               <span style={{fontSize:10,color:scoreColor(meddicTotal),fontFamily:"'JetBrains Mono',monospace",background:scoreColor(meddicTotal)+"22",borderRadius:4,padding:"1px 6px",marginLeft:2}}>{meddicTotal}/30</span>
@@ -1326,8 +1331,8 @@ function DealDetailModal({deal, cos, cts, users, lang, currency, stages, t, onSa
         <MeddicPanel deal={deal} lang={lang} t={t} onSaveEval={onSaveEval} onDeleteEval={onDeleteEval}/>
       )}
       {tab==="notes" && (
-        <div style={{fontSize:13,color:"#5a6b7a",lineHeight:1.7,whiteSpace:"pre-wrap"}}>
-          {deal.notes || <span style={{color:"#8ea4b8",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>Sin notas.</span>}
+        <div style={{fontSize:13,color:"#475569",lineHeight:1.7,whiteSpace:"pre-wrap"}}>
+          {deal.notes || <span style={{color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>Sin notas.</span>}
         </div>
       )}
       {tab==="activities" && (
@@ -1387,10 +1392,10 @@ function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
 }
 
 // ─── Import Modal ─────────────────────────────────────────────────────────────
-function ImportModal({type,t,cos,onImportCo,onImportCt,onClose}){const[state,setState]=useState("idle");const[result,setResult]=useState(null);const[dragOver,setDragOver]=useState(false);const fileRef=useRef();const isCo=type==="company";const cols=isCo?CO_COLS:CT_COLS;const templateData=isCo?[{name:"Acme Corp",industry:"Tecnología",website:"acme.com",phone:"+52 55 1234 5678",notes:""}]:[{name:"Ana García",email:"ana@empresa.com",phone:"+52 55 1111 2222",titleF:"CEO",linkedin:"",companyName:"Acme Corp",notes:""}];const downloadTemplate=()=>downloadBlob(toCSV(templateData,cols),isCo?"plantilla_empresas.csv":"plantilla_contactos.csv");const processFile=file=>{if(!file)return;setState("processing");const reader=new FileReader();reader.onload=e=>{const{headers,rows,errors:parseErrors}=parseCSV(e.target.result);const missing=cols.filter(c=>!headers.includes(c));if(missing.length){setResult({ok:0,errors:[`${t.importColError}: ${missing.join(", ")}`],missing:true});setState("result");return;}let ok=0,errors=[...parseErrors.map(pe=>`CSV row ${pe.row+2}: ${pe.message}`)];const imported=[];rows.forEach((row,i)=>{if(!row.name?.trim()){errors.push(`Fila ${i+2}: name vacío`);return;}if(isCo){imported.push({id:uid(),name:row.name.trim(),industry:row.industry||"",website:row.website||"",phone:row.phone||"",notes:row.notes||""});ok++;}else{const co=cos.find(c=>c.name.toLowerCase()===(row.companyName||"").toLowerCase());imported.push({id:uid(),name:row.name.trim(),email:row.email||"",phone:row.phone||"",titleF:row.titleF||"",linkedin:row.linkedin||"",companyId:co?.id||"",notes:row.notes||""});ok++;}});if(isCo)onImportCo(imported);else onImportCt(imported);setResult({ok,errors});setState("result");};reader.readAsText(file,"UTF-8");};const onDrop=e=>{e.preventDefault();setDragOver(false);processFile(e.dataTransfer.files[0]);};return(<Modal title={`${t.importTitle} — ${isCo?t.companies:t.contacts}`} onClose={onClose} wide><div style={{background:"#f0f4f8",border:"1px solid #c8d6e4",borderRadius:10,padding:14,marginBottom:16}}><p style={{fontSize:12,color:"#5a6b7a",margin:"0 0 10px",lineHeight:1.6}}>{t.importDesc}</p><p style={{fontSize:11,color:"#5a6b7a",margin:"0 0 12px"}}>{t.overwriteWarn}</p><div style={{background:"#ffffff",borderRadius:8,padding:"10px 12px",marginBottom:12}}><div style={{fontSize:10,color:"#6b7d8e",fontFamily:"'JetBrains Mono',monospace",letterSpacing:.7,marginBottom:6,textTransform:"uppercase"}}>Columnas</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{cols.map(c=><span key={c} style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",background:"#c8d6e4",color:"#4a5a6a",borderRadius:5,padding:"2px 8px"}}>{c}</span>)}</div></div><Btn ch={<><Ic n="template" s={12}/>{t.downloadTemplate}</>} v="subtle" onClick={downloadTemplate}/></div>{state==="idle"&&(<div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop} onClick={()=>fileRef.current?.click()} style={{border:`2px dashed ${dragOver?"#003e7e":"#c8d6e4"}`,borderRadius:12,padding:"32px 20px",textAlign:"center",cursor:"pointer",background:dragOver?"#0d1a2e":"#f0f4f8",transition:"all .15s"}}><div style={{color:dragOver?"#27aae1":"#8ea4b8",marginBottom:8}}><Ic n="upload" s={28}/></div><div style={{fontSize:13,color:dragOver?"#27aae1":"#5a6b7a"}}>{t.dragDrop}</div><input ref={fileRef} type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={e=>processFile(e.target.files[0])}/></div>)}{state==="result"&&result&&(<div>{!result.missing&&(<div style={{background:"#e8f5ee",border:"1px solid #a0d4b0",borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}><span style={{color:"#22c55e"}}><Ic n="check" s={16}/></span><span style={{fontSize:13,color:"#22c55e",fontWeight:600}}>{result.ok} {t.importSuccess}</span></div>)}{result.errors?.length>0&&(<div style={{background:"#fde8e8",border:"1px solid #d4a0a0",borderRadius:10,padding:"12px 16px",marginBottom:12}}><div style={{fontSize:12,color:"#ef4444",fontWeight:600,marginBottom:6}}>{result.errors.length} {t.importErrors}</div>{result.errors.map((e,i)=><div key={i} style={{fontSize:11,color:"#9a3535",fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>• {e}</div>)}</div>)}<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn ch={t.close} v="primary" onClick={onClose}/></div></div>)}</Modal>);}
+function ImportModal({type,t,cos,onImportCo,onImportCt,onClose}){const[state,setState]=useState("idle");const[result,setResult]=useState(null);const[dragOver,setDragOver]=useState(false);const fileRef=useRef();const isCo=type==="company";const cols=isCo?CO_COLS:CT_COLS;const templateData=isCo?[{name:"Acme Corp",industry:"Tecnología",website:"acme.com",phone:"+52 55 1234 5678",notes:""}]:[{name:"Ana García",email:"ana@empresa.com",phone:"+52 55 1111 2222",titleF:"CEO",linkedin:"",companyName:"Acme Corp",notes:""}];const downloadTemplate=()=>downloadBlob(toCSV(templateData,cols),isCo?"plantilla_empresas.csv":"plantilla_contactos.csv");const processFile=file=>{if(!file)return;setState("processing");const reader=new FileReader();reader.onload=e=>{const{headers,rows,errors:parseErrors}=parseCSV(e.target.result);const missing=cols.filter(c=>!headers.includes(c));if(missing.length){setResult({ok:0,errors:[`${t.importColError}: ${missing.join(", ")}`],missing:true});setState("result");return;}let ok=0,errors=[...parseErrors.map(pe=>`CSV row ${pe.row+2}: ${pe.message}`)];const imported=[];rows.forEach((row,i)=>{if(!row.name?.trim()){errors.push(`Fila ${i+2}: name vacío`);return;}if(isCo){imported.push({id:uid(),name:row.name.trim(),industry:row.industry||"",website:row.website||"",phone:row.phone||"",notes:row.notes||""});ok++;}else{const co=cos.find(c=>c.name.toLowerCase()===(row.companyName||"").toLowerCase());imported.push({id:uid(),name:row.name.trim(),email:row.email||"",phone:row.phone||"",titleF:row.titleF||"",linkedin:row.linkedin||"",companyId:co?.id||"",notes:row.notes||""});ok++;}});if(isCo)onImportCo(imported);else onImportCt(imported);setResult({ok,errors});setState("result");};reader.readAsText(file,"UTF-8");};const onDrop=e=>{e.preventDefault();setDragOver(false);processFile(e.dataTransfer.files[0]);};return(<Modal title={`${t.importTitle} — ${isCo?t.companies:t.contacts}`} onClose={onClose} wide><div style={{background:"#f5f7fa",border:"1px solid #e2e8f0",borderRadius:10,padding:14,marginBottom:16}}><p style={{fontSize:12,color:"#475569",margin:"0 0 10px",lineHeight:1.6}}>{t.importDesc}</p><p style={{fontSize:11,color:"#475569",margin:"0 0 12px"}}>{t.overwriteWarn}</p><div style={{background:"#ffffff",borderRadius:8,padding:"10px 12px",marginBottom:12}}><div style={{fontSize:10,color:"#64748b",fontFamily:"'JetBrains Mono',monospace",letterSpacing:.7,marginBottom:6,textTransform:"uppercase"}}>Columnas</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{cols.map(c=><span key={c} style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",background:"#e2e8f0",color:"#334155",borderRadius:5,padding:"2px 8px"}}>{c}</span>)}</div></div><Btn ch={<><Ic n="template" s={12}/>{t.downloadTemplate}</>} v="subtle" onClick={downloadTemplate}/></div>{state==="idle"&&(<div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop} onClick={()=>fileRef.current?.click()} style={{border:`2px dashed ${dragOver?"#003e7e":"#e2e8f0"}`,borderRadius:12,padding:"32px 20px",textAlign:"center",cursor:"pointer",background:dragOver?"#0d1a2e":"#f5f7fa",transition:"all .15s"}}><div style={{color:dragOver?"#27aae1":"#94a3b8",marginBottom:8}}><Ic n="upload" s={28}/></div><div style={{fontSize:13,color:dragOver?"#27aae1":"#475569"}}>{t.dragDrop}</div><input ref={fileRef} type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={e=>processFile(e.target.files[0])}/></div>)}{state==="result"&&result&&(<div>{!result.missing&&(<div style={{background:"#e8f5ee",border:"1px solid #a0d4b0",borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}><span style={{color:"#22c55e"}}><Ic n="check" s={16}/></span><span style={{fontSize:13,color:"#22c55e",fontWeight:600}}>{result.ok} {t.importSuccess}</span></div>)}{result.errors?.length>0&&(<div style={{background:"#fde8e8",border:"1px solid #d4a0a0",borderRadius:10,padding:"12px 16px",marginBottom:12}}><div style={{fontSize:12,color:"#ef4444",fontWeight:600,marginBottom:6}}>{result.errors.length} {t.importErrors}</div>{result.errors.map((e,i)=><div key={i} style={{fontSize:11,color:"#9a3535",fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>• {e}</div>)}</div>)}<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn ch={t.close} v="primary" onClick={onClose}/></div></div>)}</Modal>);}
 
 // ─── Bulk Bar ─────────────────────────────────────────────────────────────────
-function BulkBar({type,t,data,cos,onImportCo,onImportCt}){const[open,setOpen]=useState(false);const[importOpen,setImportOpen]=useState(false);const isCo=type==="company";const handleExport=()=>{const cols=isCo?CO_COLS:CT_COLS;const rows=isCo?data:data.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);return{...ct,companyName:co?.name||""};});const filename=isCo?`empresas_${new Date().toISOString().slice(0,10)}.csv`:`contactos_${new Date().toISOString().slice(0,10)}.csv`;downloadBlob(toCSV(rows,cols),filename);};return(<><div style={{position:"relative",display:"inline-block"}}><Btn ch={<><Ic n="layers" s={12}/>{t.importExport}<Ic n="chevDown" s={11}/></>} v="subtle" onClick={()=>setOpen(p=>!p)}/>{open&&(<div style={{position:"absolute",right:0,top:"calc(100% + 6px)",background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:10,minWidth:200,boxShadow:"0 8px 32px rgba(0,62,126,.1)",zIndex:100,overflow:"hidden"}}><button onClick={()=>{setOpen(false);setImportOpen(true);}} style={{width:"100%",background:"none",border:"none",color:"#1a2a3a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #b8d8eb"}}><Ic n="upload" s={13}/>{t.importCSV}</button><button onClick={()=>{setOpen(false);handleExport();}} style={{width:"100%",background:"none",border:"none",color:"#1a2a3a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #b8d8eb"}}><Ic n="download" s={13}/>{t.exportCSV}</button><button onClick={()=>{setOpen(false);const cols=isCo?CO_COLS:CT_COLS;const tpl=isCo?[{name:"Ejemplo SA",industry:"Retail",website:"ejemplo.com",phone:"+52 55 0000 0000",notes:""}]:[{name:"Juan Pérez",email:"juan@co.com",phone:"+52 55 0000 0000",titleF:"Gerente",linkedin:"",companyName:"Ejemplo SA",notes:""}];downloadBlob(toCSV(tpl,cols),isCo?"plantilla_empresas.csv":"plantilla_contactos.csv");}} style={{width:"100%",background:"none",border:"none",color:"#4a5a6a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit"}}><Ic n="template" s={13}/>{t.downloadTemplate}</button></div>)}</div>{importOpen&&<ImportModal type={type} t={t} cos={cos} onImportCo={onImportCo} onImportCt={onImportCt} onClose={()=>setImportOpen(false)}/>}{open&&<div style={{position:"fixed",inset:0,zIndex:99}} onClick={()=>setOpen(false)}/>}</>);}
+function BulkBar({type,t,data,cos,onImportCo,onImportCt}){const[open,setOpen]=useState(false);const[importOpen,setImportOpen]=useState(false);const isCo=type==="company";const handleExport=()=>{const cols=isCo?CO_COLS:CT_COLS;const rows=isCo?data:data.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);return{...ct,companyName:co?.name||""};});const filename=isCo?`empresas_${new Date().toISOString().slice(0,10)}.csv`:`contactos_${new Date().toISOString().slice(0,10)}.csv`;downloadBlob(toCSV(rows,cols),filename);};return(<><div style={{position:"relative",display:"inline-block"}}><Btn ch={<><Ic n="layers" s={12}/>{t.importExport}<Ic n="chevDown" s={11}/></>} v="subtle" onClick={()=>setOpen(p=>!p)}/>{open&&(<div style={{position:"absolute",right:0,top:"calc(100% + 6px)",background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:10,minWidth:200,boxShadow:"0 8px 32px rgba(0,62,126,.1)",zIndex:100,overflow:"hidden"}}><button onClick={()=>{setOpen(false);setImportOpen(true);}} style={{width:"100%",background:"none",border:"none",color:"#0f172a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #d9e2ec"}}><Ic n="upload" s={13}/>{t.importCSV}</button><button onClick={()=>{setOpen(false);handleExport();}} style={{width:"100%",background:"none",border:"none",color:"#0f172a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #d9e2ec"}}><Ic n="download" s={13}/>{t.exportCSV}</button><button onClick={()=>{setOpen(false);const cols=isCo?CO_COLS:CT_COLS;const tpl=isCo?[{name:"Ejemplo SA",industry:"Retail",website:"ejemplo.com",phone:"+52 55 0000 0000",notes:""}]:[{name:"Juan Pérez",email:"juan@co.com",phone:"+52 55 0000 0000",titleF:"Gerente",linkedin:"",companyName:"Ejemplo SA",notes:""}];downloadBlob(toCSV(tpl,cols),isCo?"plantilla_empresas.csv":"plantilla_contactos.csv");}} style={{width:"100%",background:"none",border:"none",color:"#334155",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit"}}><Ic n="template" s={13}/>{t.downloadTemplate}</button></div>)}</div>{importOpen&&<ImportModal type={type} t={t} cos={cos} onImportCo={onImportCo} onImportCt={onImportCt} onClose={()=>setImportOpen(false)}/>}{open&&<div style={{position:"fixed",inset:0,zIndex:99}} onClick={()=>setOpen(false)}/>}</>);}
 
 // ─── Kanban ───────────────────────────────────────────────────────────────────
 const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit,onDel,onStage,onViewDeal,fontSizeMode="medium"}){
@@ -1405,9 +1410,9 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
     <div style={{zoom}}>
       <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
         {[{l:t.pipelineTotal,v:fv(pipe,currency),c:"#27aae1"},{l:t.closedWon,v:fv(won,currency),c:"#22c55e"},{l:t.totalDeals,v:deals.length,c:"#7c2b83"}].map(s=>(
-          <div key={s.l} style={{background:"#ffffff",border:"1px solid #c8d6e4",borderRadius:12,padding:"10px 16px",flex:1,minWidth:120}}>
-            <div style={{fontSize:10,color:"#6b7d8e",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
-            <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'DM Sans',Arial,sans-serif"}}>{s.v}</div>
+          <div key={s.l} style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:12,padding:"10px 16px",flex:1,minWidth:120}}>
+            <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
+            <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'Inter',Arial,sans-serif"}}>{s.v}</div>
           </div>
         ))}
       </div>
@@ -1429,7 +1434,7 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
                   <span style={{fontSize:12}}>{m.emoji}</span>
                   <span style={{fontSize:10,fontWeight:600,color:m.accent,fontFamily:"'JetBrains Mono',monospace",letterSpacing:.2}}>{stage}</span>
                 </div>
-                <span style={{fontSize:10,color:"#6b7d8e",background:"#f0f4f8",borderRadius:4,padding:"1px 5px",fontFamily:"'JetBrains Mono',monospace"}}>{col.length}</span>
+                <span style={{fontSize:10,color:"#64748b",background:"#f5f7fa",borderRadius:4,padding:"1px 5px",fontFamily:"'JetBrains Mono',monospace"}}>{col.length}</span>
               </div>
               {colV>0&&<div style={{fontSize:10,color:m.accent,marginBottom:7,fontFamily:"'JetBrains Mono',monospace",opacity:.75}}>{fv(colV,currency)}</div>}
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -1443,22 +1448,22 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
                     <div key={dl.id} draggable
                       onDragStart={()=>setDrag(dl)}
                       onDragEnd={()=>{setDrag(null);setOver(null);}}
-                      style={{background:"#f0f4f8",border:"1px solid #b8d8eb",borderRadius:9,padding:"9px",cursor:"grab",userSelect:"none",opacity:drag?.id===dl.id?.4:1,transition:"opacity .1s"}}>
+                      style={{background:"#f5f7fa",border:"1px solid #d9e2ec",borderRadius:9,padding:"9px",cursor:"grab",userSelect:"none",opacity:drag?.id===dl.id?.4:1,transition:"opacity .1s"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:3}}>
-                        <div style={{fontSize:12,fontWeight:600,color:"#1a2a3a",lineHeight:1.3,flex:1}}>{dl.name}</div>
+                        <div style={{fontSize:12,fontWeight:600,color:"#0f172a",lineHeight:1.3,flex:1}}>{dl.name}</div>
                         <div style={{display:"flex",gap:1,flexShrink:0}}>
                           <button onClick={e=>{e.stopPropagation();onViewDeal(dl);}} title="MEDDIC"
-                            style={{background:"none",border:"none",color:"#4a5a6a",cursor:"pointer",padding:"2px 3px",opacity:.65}}><Ic n="meddic" s={11}/></button>
+                            style={{background:"none",border:"none",color:"#334155",cursor:"pointer",padding:"2px 3px",opacity:.65}}><Ic n="meddic" s={11}/></button>
                           <button onClick={e=>{e.stopPropagation();onEdit(dl);}}
                             style={{background:"none",border:"none",color:m.accent,cursor:"pointer",padding:"2px 3px",opacity:.65}}><Ic n="edit" s={11}/></button>
                           <button onClick={e=>{e.stopPropagation();onDel(dl.id);}}
                             style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:"2px 3px",opacity:.55}}><Ic n="trash" s={11}/></button>
                         </div>
                       </div>
-                      {Number(dl.value)>0&&<div style={{fontSize:13,fontWeight:700,color:m.accent,marginTop:4,fontFamily:"'DM Sans',Arial,sans-serif"}}>{fv(dl.value,currency)}</div>}
-                      {co&&<div style={{fontSize:10,color:"#5a6b7a",marginTop:3}}>🏢 {co.name}</div>}
-                      {ct&&<div style={{fontSize:10,color:"#5a6b7a"}}>👤 {ct.name}</div>}
-                      {dl.closingDate&&<div style={{fontSize:9,color:"#8ea4b8",marginTop:4,fontFamily:"'JetBrains Mono',monospace"}}>{t.closing}: {dl.closingDate}</div>}
+                      {Number(dl.value)>0&&<div style={{fontSize:13,fontWeight:700,color:m.accent,marginTop:4,fontFamily:"'Inter',Arial,sans-serif"}}>{fv(dl.value,currency)}</div>}
+                      {co&&<div style={{fontSize:10,color:"#475569",marginTop:3}}>🏢 {co.name}</div>}
+                      {ct&&<div style={{fontSize:10,color:"#475569"}}>👤 {ct.name}</div>}
+                      {dl.closingDate&&<div style={{fontSize:9,color:"#94a3b8",marginTop:4,fontFamily:"'JetBrains Mono',monospace"}}>{t.closing}: {dl.closingDate}</div>}
 
                       {/* MEDDIC score badge */}
                       <div style={{marginTop:7,paddingTop:7,borderTop:"1px solid #dce4ec",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}
@@ -1471,21 +1476,21 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
                                 const sc=latestEv?.meddic[k]?.score||0;
                                 return(
                                   <div key={k} title={`${meta.letter}: ${sc}/5`}
-                                    style={{width:14,height:14,borderRadius:3,background:sc>0?meta.color+"33":"#c8d6e4",border:`1px solid ${sc>0?meta.color+"55":"#c8d6e4"}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                                    <span style={{fontSize:7,color:sc>0?meta.color:"#8ea4b8",fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{sc}</span>
+                                    style={{width:14,height:14,borderRadius:3,background:sc>0?meta.color+"33":"#e2e8f0",border:`1px solid ${sc>0?meta.color+"55":"#e2e8f0"}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                    <span style={{fontSize:7,color:sc>0?meta.color:"#94a3b8",fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{sc}</span>
                                   </div>
                                 );
                               })}
                             </div>
                             <div style={{display:"flex",alignItems:"center",gap:4}}>
-                              <div style={{width:30,height:4,background:"#c8d6e4",borderRadius:2,overflow:"hidden"}}>
+                              <div style={{width:30,height:4,background:"#e2e8f0",borderRadius:2,overflow:"hidden"}}>
                                 <div style={{height:"100%",width:`${(mTotal/30)*100}%`,background:scoreColor(mTotal),borderRadius:2,transition:"width .3s"}}/>
                               </div>
                               <span style={{fontSize:9,color:scoreColor(mTotal),fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>{mTotal}/30</span>
                             </div>
                           </>
                         ) : (
-                          <div style={{fontSize:9,color:"#8ea4b8",fontFamily:"'JetBrains Mono',monospace",display:"flex",alignItems:"center",gap:4}}>
+                          <div style={{fontSize:9,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",display:"flex",alignItems:"center",gap:4}}>
                             <Ic n="meddic" s={9}/>MEDDIC sin evaluar
                           </div>
                         )}
@@ -1493,7 +1498,7 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
                     </div>
                   );
                 })}
-                {col.length===0&&<div style={{fontSize:10,color:"#c8d6e4",textAlign:"center",padding:"10px 0",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDeals}</div>}
+                {col.length===0&&<div style={{fontSize:10,color:"#e2e8f0",textAlign:"center",padding:"10px 0",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDeals}</div>}
               </div>
             </div>
           );
@@ -1676,7 +1681,7 @@ function ProspectingBoard({ lang, users=[] }) {
     await loadProspecting();
   };
 
-  if (loading) return <div style={{padding:20,fontSize:12,color:'#6b7d8e'}}>Cargando prospección...</div>;
+  if (loading) return <div style={{padding:20,fontSize:12,color:'#64748b'}}>Cargando prospección...</div>;
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
@@ -1699,8 +1704,8 @@ function ProspectingBoard({ lang, users=[] }) {
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,alignItems:'start'}}>
-        <div style={{background:'#fff',border:'1px solid #c8d6e4',borderRadius:12,overflow:'hidden'}}>
-          <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:8,padding:'10px 12px',fontSize:10,color:'#6b7d8e',fontFamily:"'JetBrains Mono',monospace",textTransform:'uppercase'}}>
+        <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,overflow:'hidden'}}>
+          <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:8,padding:'10px 12px',fontSize:10,color:'#64748b',fontFamily:"'JetBrains Mono',monospace",textTransform:'uppercase'}}>
             <div>Empresa</div><div>Estado</div><div>Owner</div><div>Próx. acción</div>
           </div>
           <div style={{maxHeight:520,overflowY:'auto'}}>
@@ -1708,8 +1713,8 @@ function ProspectingBoard({ lang, users=[] }) {
               const cActivities = activities.filter(a=>a.company_id===c.id);
               const nextDate = cActivities.map(a=>a.next_action_at).filter(Boolean).sort()[0] || '—';
               return (
-                <button key={c.id} onClick={()=>setSelectedCompanyId(c.id)} style={{width:'100%',textAlign:'left',background:selectedCompanyId===c.id?'#eef6ff':'#fff',border:'none',borderTop:'1px solid #edf2f7',padding:'10px 12px',cursor:'pointer'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:8,fontSize:12,color:'#1a2a3a',alignItems:'center'}}>
+                <button key={c.id} onClick={()=>setSelectedCompanyId(c.id)} style={{width:'100%',textAlign:'left',background:selectedCompanyId===c.id?'#eff6ff':'#fff',border:'none',borderTop:'1px solid #e2e8f0',padding:'10px 12px',cursor:'pointer'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:8,fontSize:12,color:'#0f172a',alignItems:'center'}}>
                     <div style={{fontWeight:600}}>{c.name}</div>
                     <div>{statusLabel(c.status)}</div>
                     <div>{c.owner_id || '—'}</div>
@@ -1718,19 +1723,19 @@ function ProspectingBoard({ lang, users=[] }) {
                 </button>
               );
             })}
-            {!filteredCompanies.length && <div style={{padding:16,fontSize:12,color:'#8ea4b8'}}>Sin empresas de prospección.</div>}
+            {!filteredCompanies.length && <div style={{padding:16,fontSize:12,color:'#94a3b8'}}>Sin empresas de prospección.</div>}
           </div>
         </div>
 
-        <div style={{background:'#fff',border:'1px solid #c8d6e4',borderRadius:12,minHeight:520,padding:12}}>
+        <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,minHeight:520,padding:12}}>
           {!selectedCompany ? (
-            <div style={{fontSize:12,color:'#8ea4b8'}}>Selecciona una empresa para ver detalle.</div>
+            <div style={{fontSize:12,color:'#94a3b8'}}>Selecciona una empresa para ver detalle.</div>
           ) : (
             <>
               <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'start'}}>
                 <div>
                   <h3 style={{margin:'0 0 4px',fontSize:18}}>{selectedCompany.name}</h3>
-                  <div style={{display:'flex',gap:8,fontSize:11,color:'#6b7d8e'}}>
+                  <div style={{display:'flex',gap:8,fontSize:11,color:'#64748b'}}>
                     <span>{statusLabel(selectedCompany.status)}</span>
                     <span>•</span>
                     <span>{selectedCompany.owner_id || 'Sin owner'}</span>
@@ -1745,7 +1750,7 @@ function ProspectingBoard({ lang, users=[] }) {
 
               <div style={{display:'flex',gap:6,marginTop:12,borderBottom:'1px solid #e5edf5'}}>
                 {[{k:'timeline',l:'Timeline'},{k:'contacts',l:'Contactos'},{k:'summary',l:'Resumen'}].map(tb=>(
-                  <button key={tb.k} onClick={()=>setActiveTab(tb.k)} style={{background:'none',border:'none',borderBottom:activeTab===tb.k?'2px solid #003e7e':'2px solid transparent',padding:'8px 10px',cursor:'pointer',fontSize:12,color:activeTab===tb.k?'#003e7e':'#6b7d8e'}}>{tb.l}</button>
+                  <button key={tb.k} onClick={()=>setActiveTab(tb.k)} style={{background:'none',border:'none',borderBottom:activeTab===tb.k?'2px solid #003e7e':'2px solid transparent',padding:'8px 10px',cursor:'pointer',fontSize:12,color:activeTab===tb.k?'#003e7e':'#64748b'}}>{tb.l}</button>
                 ))}
               </div>
 
@@ -1755,7 +1760,7 @@ function ProspectingBoard({ lang, users=[] }) {
                   {companyActivities.map(a=>{
                     const ctc = contacts.find(c=>c.id===a.contact_id);
                     return (
-                      <div key={a.id} onClick={()=>setModal({ type:'activity', data:a })} style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:'10px 11px',cursor:'pointer'}}>
+                      <div key={a.id} onClick={()=>setModal({ type:'activity', data:a })} style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 11px',cursor:'pointer'}}>
                         <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
                           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <div style={{fontSize:12,fontWeight:600}}>{activityTypeLabel(a.activity_type)} {ctc?`· ${ctc.name}`:''}</div>
@@ -1769,47 +1774,47 @@ function ProspectingBoard({ lang, users=[] }) {
                             </select>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:6}}>
-                            <div style={{fontSize:10,color:'#6b7d8e',fontFamily:"'JetBrains Mono',monospace"}}>{String(a.activity_at||'').slice(0,16).replace('T',' ')}</div>
+                            <div style={{fontSize:10,color:'#64748b',fontFamily:"'JetBrains Mono',monospace"}}>{String(a.activity_at||'').slice(0,16).replace('T',' ')}</div>
                             <button title="Borrar actividad" onClick={(e)=>{e.stopPropagation(); deleteActivity(a.id);}} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:2,opacity:.7}}><Ic n="trash" s={12}/></button>
                           </div>
                         </div>
-                        {a.outcome && <div style={{fontSize:11,color:'#4a5a6a',marginTop:4}}>Resultado: {a.outcome}</div>}
-                        {a.next_step && <div style={{fontSize:11,color:'#4a5a6a'}}>Siguiente paso: {a.next_step}</div>}
-                        {a.next_action_at && <div style={{fontSize:11,color:'#4a5a6a'}}>Próxima acción: {String(a.next_action_at).slice(0,10)}</div>}
-                        {a.notes && <div style={{fontSize:11,color:'#6b7d8e',marginTop:4,whiteSpace:'pre-wrap'}}>{a.notes}</div>}
+                        {a.outcome && <div style={{fontSize:11,color:'#334155',marginTop:4}}>Resultado: {a.outcome}</div>}
+                        {a.next_step && <div style={{fontSize:11,color:'#334155'}}>Siguiente paso: {a.next_step}</div>}
+                        {a.next_action_at && <div style={{fontSize:11,color:'#334155'}}>Próxima acción: {String(a.next_action_at).slice(0,10)}</div>}
+                        {a.notes && <div style={{fontSize:11,color:'#64748b',marginTop:4,whiteSpace:'pre-wrap'}}>{a.notes}</div>}
                       </div>
                     );
                   })}
-                  {!companyActivities.length && <div style={{fontSize:12,color:'#8ea4b8'}}>Sin actividades registradas.</div>}
+                  {!companyActivities.length && <div style={{fontSize:12,color:'#94a3b8'}}>Sin actividades registradas.</div>}
                 </div>
               )}
 
               {activeTab==='contacts' && (
                 <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:8,maxHeight:390,overflowY:'auto'}}>
                   {companyContacts.map(c=>(
-                    <div key={c.id} style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:'10px 11px'}}>
+                    <div key={c.id} style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 11px'}}>
                       <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}>
                         <div style={{fontSize:12,fontWeight:600}}>{c.name}</div>
                         <button title="Borrar contacto" onClick={()=>deleteContact(c.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:2,opacity:.7}}><Ic n="trash" s={12}/></button>
                       </div>
-                      <div style={{fontSize:11,color:'#5a6b7a'}}>{[c.title,c.email,c.phone].filter(Boolean).join(' · ') || 'Sin datos adicionales'}</div>
+                      <div style={{fontSize:11,color:'#475569'}}>{[c.title,c.email,c.phone].filter(Boolean).join(' · ') || 'Sin datos adicionales'}</div>
                     </div>
                   ))}
-                  {!companyContacts.length && <div style={{fontSize:12,color:'#8ea4b8'}}>Sin contactos.</div>}
+                  {!companyContacts.length && <div style={{fontSize:12,color:'#94a3b8'}}>Sin contactos.</div>}
                 </div>
               )}
 
               {activeTab==='summary' && (
                 <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  <div style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:10}}>
-                    <div style={{fontSize:10,color:'#6b7d8e',textTransform:'uppercase'}}>Total actividades</div>
+                  <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:10,padding:10}}>
+                    <div style={{fontSize:10,color:'#64748b',textTransform:'uppercase'}}>Total actividades</div>
                     <div style={{fontSize:22,fontWeight:700,color:'#003e7e'}}>{companyActivities.length}</div>
                   </div>
-                  <div style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:10}}>
-                    <div style={{fontSize:10,color:'#6b7d8e',textTransform:'uppercase'}}>Contactos activos</div>
+                  <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:10,padding:10}}>
+                    <div style={{fontSize:10,color:'#64748b',textTransform:'uppercase'}}>Contactos activos</div>
                     <div style={{fontSize:22,fontWeight:700,color:'#003e7e'}}>{companyContacts.length}</div>
                   </div>
-                  <div style={{gridColumn:'1 / -1',background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:10,fontSize:12,color:'#4a5a6a'}}>
+                  <div style={{gridColumn:'1 / -1',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:10,padding:10,fontSize:12,color:'#334155'}}>
                     {selectedCompany.notes || 'Sin notas de empresa.'}
                   </div>
                 </div>
@@ -2153,66 +2158,66 @@ function AppInner(){
   return(
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:4px;height:4px;}
-        ::-webkit-scrollbar-track{background:#f0f4f8;}
-        ::-webkit-scrollbar-thumb{background:#c8d6e4;border-radius:4px;}
+        ::-webkit-scrollbar-track{background:#f5f7fa;}
+        ::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:4px;}
         input[type=date]::-webkit-calendar-picker-indicator{}
-        input::placeholder,textarea::placeholder{color:#c8d6e4;}
+        input::placeholder,textarea::placeholder{color:#e2e8f0;}
         select option{background:#ffffff;}
         button:focus{outline:none;}
       `}</style>
-      <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:"'DM Sans',Arial,sans-serif",color:"#1a2a3a"}}>
+      <div style={{minHeight:"100vh",background:"#f5f7fa",fontFamily:"'Inter',Arial,sans-serif",color:"#0f172a"}}>
 
         {/* Header */}
-        <header style={{background:"#ffffff",borderBottom:"1px solid #b8d8eb",padding:"13px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+        <header style={{background:"#ffffff",borderBottom:"1px solid #d9e2ec",padding:"13px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
           <div>
             <div style={{display:"flex",alignItems:"center",gap:9}}>
               <img src="/intelsius-logo.jpg" alt="Intelsius" style={{height:30,width:"auto",borderRadius:4,objectFit:"contain",background:"#fff"}} />
-              <span style={{fontSize:19,fontFamily:"'DM Sans',Arial,sans-serif",color:"#1a2a3a"}}>{t.appName}</span>
+              <span style={{fontSize:19,fontFamily:"'Inter',Arial,sans-serif",color:"#0f172a"}}>{t.appName}</span>
               <SaveIndicator status={saveStatus}/>
             </div>
-            <div style={{fontSize:10,color:"#8ea4b8",fontFamily:"'JetBrains Mono',monospace",marginTop:2,paddingLeft:39}}>
+            <div style={{fontSize:10,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",marginTop:2,paddingLeft:39}}>
               {cos.length} {t.companies.toLowerCase()} · {cts.length} {t.contactsW} · {dls.length} deals
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
-            <div style={{display:"flex",background:"#f0f4f8",border:"1px solid #b8d8eb",borderRadius:7,overflow:"hidden"}}>
+            <div style={{display:"flex",background:"#f5f7fa",border:"1px solid #d9e2ec",borderRadius:7,overflow:"hidden"}}>
               {["es","en"].map(l=>(
-                <button key={l} onClick={()=>setLang(l)} style={{background:lang===l?"#003e7e":"transparent",color:lang===l?"#fff":"#6b7d8e",border:"none",padding:"4px 13px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:.5,transition:"all .12s"}}>{l.toUpperCase()}</button>
+                <button key={l} onClick={()=>setLang(l)} style={{background:lang===l?"#003e7e":"transparent",color:lang===l?"#fff":"#64748b",border:"none",padding:"4px 13px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:.5,transition:"all .12s"}}>{l.toUpperCase()}</button>
               ))}
             </div>
             <select value={currency} onChange={e=>setCurrency(e.target.value)}
               title={t.currency}
-              style={{background:"#f0f4f8",border:"1px solid #b8d8eb",borderRadius:7,padding:"4px 8px",color:"#1a2a3a",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
+              style={{background:"#f5f7fa",border:"1px solid #d9e2ec",borderRadius:7,padding:"4px 8px",color:"#0f172a",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
               {CURRENCIES.map(c=>(
                 <option key={c.code} value={c.code}>{c.code}</option>
               ))}
             </select>
             <div style={{position:"relative"}}>
-              <span style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",color:"#8ea4b8"}}><Ic n="search" s={12}/></span>
+              <span style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",color:"#94a3b8"}}><Ic n="search" s={12}/></span>
               <input value={q} onChange={e=>setQ(e.target.value)} placeholder={t.search}
-                style={{background:"#ffffff",border:"1px solid #b8d8eb",borderRadius:7,padding:"6px 11px 6px 27px",color:"#1a2a3a",fontSize:12,fontFamily:"inherit",outline:"none",width:160}}/>
+                style={{background:"#ffffff",border:"1px solid #d9e2ec",borderRadius:7,padding:"6px 11px 6px 27px",color:"#0f172a",fontSize:12,fontFamily:"inherit",outline:"none",width:160}}/>
             </div>
             {addT && <Btn ch={<><Ic n="plus" s={12}/>{addL}</>} onClick={()=>setModal({type:addT,data:{}})} sx={{padding:"6px 14px"}}/>}
           </div>
         </header>
 
         {/* Tabs */}
-        <nav style={{background:"#ffffff",borderBottom:"1px solid #b8d8eb",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+        <nav style={{background:"#ffffff",borderBottom:"1px solid #d9e2ec",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
           <div style={{display:"flex",gap:2}}>
             {TABS.map(tb=>(
               <button key={tb.k} onClick={()=>setTab(tb.k)}
-                style={{background:"none",border:"none",borderBottom:`2px solid ${tab===tb.k?"#003e7e":"transparent"}`,padding:"10px 15px",color:tab===tb.k?"#27aae1":"#6b7d8e",fontFamily:"inherit",fontSize:13,fontWeight:tab===tb.k?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"color .12s"}}>
+                style={{background:"none",border:"none",borderBottom:`2px solid ${tab===tb.k?"#003e7e":"transparent"}`,padding:"10px 15px",color:tab===tb.k?"#27aae1":"#64748b",fontFamily:"inherit",fontSize:13,fontWeight:tab===tb.k?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"color .12s"}}>
                 <Ic n={tb.i} s={12}/>{tb.l}
               </button>
             ))}
           </div>
           <div style={{padding:"6px 0",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            <div style={{display:"flex",background:"#f0f4f8",border:"1px solid #b8d8eb",borderRadius:7,overflow:"hidden"}}>
+            <div style={{display:"flex",background:"#f5f7fa",border:"1px solid #d9e2ec",borderRadius:7,overflow:"hidden"}}>
               {[{k:"small",l:"Pequeño"},{k:"medium",l:"Mediano"},{k:"large",l:"Grande"}].map(o=>(
-                <button key={o.k} onClick={()=>setPipelineFontSize(o.k)} style={{background:pipelineFontSize===o.k?"#003e7e":"transparent",color:pipelineFontSize===o.k?"#fff":"#6b7d8e",border:"none",padding:"4px 10px",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{o.l}</button>
+                <button key={o.k} onClick={()=>setPipelineFontSize(o.k)} style={{background:pipelineFontSize===o.k?"#003e7e":"transparent",color:pipelineFontSize===o.k?"#fff":"#64748b",border:"none",padding:"4px 10px",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{o.l}</button>
               ))}
             </div>
             {tab==="deals" && <Btn v="subtle" ch={<><Ic n="edit" s={12}/>{t.pipelineEditor}</>} onClick={()=>setPipelineEditorOpen(true)} sx={{fontSize:11,padding:"5px 12px"}}/>}
@@ -2237,14 +2242,14 @@ function AppInner(){
           )}
           {tab==="companies"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:11}}>
-              {fCo.map(co=>{const coD=dls.filter(d=>d.companyId===co.id);const coC=cts.filter(c=>c.companyId===co.id);const ch=(co.name.charCodeAt(0)*47)%360;return(<div key={co.id} style={{background:"#ffffff",border:"1px solid #b8d8eb",borderRadius:13,padding:16}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><div style={{width:38,height:38,borderRadius:9,background:`hsl(${ch},55%,14%)`,border:`1px solid hsl(${ch},55%,28%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:`hsl(${ch},75%,60%)`,marginBottom:9,fontFamily:"'DM Sans',Arial,sans-serif"}}>{co.name.charAt(0).toUpperCase()}</div><div style={{fontSize:14,fontWeight:600,color:"#1a2a3a"}}>{co.name}</div>{co.industry&&<div style={{fontSize:11,color:"#6b7d8e",marginTop:1}}>{co.industry}</div>}</div><div style={{display:"flex",gap:3}}><button onClick={()=>setModal({type:"company",data:co})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button><button onClick={()=>requestDelCo(co.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button></div></div><div style={{borderTop:"1px solid #b8d8eb",marginTop:11,paddingTop:9,display:"flex",flexDirection:"column",gap:4}}>{co.phone&&<div style={{fontSize:11,color:"#5a6b7a"}}>📞 {co.phone}</div>}{co.website&&<div style={{fontSize:11,color:"#003e7e",display:"flex",alignItems:"center",gap:3}}><Ic n="globe" s={10}/>{co.website}</div>}</div><div style={{display:"flex",gap:7,marginTop:9}}><span style={{fontSize:11,color:"#5a6b7a",background:"#f0f4f8",borderRadius:5,padding:"2px 7px"}}>💼 {coD.length} {t.dealsW}</span><span style={{fontSize:11,color:"#5a6b7a",background:"#f0f4f8",borderRadius:5,padding:"2px 7px"}}>👤 {coC.length} {t.contactsW}</span></div>{co.notes&&<div style={{fontSize:11,color:"#6b7d8e",marginTop:9,borderTop:"1px solid #b8d8eb",paddingTop:8,lineHeight:1.5}}>{co.notes}</div>}</div>);})}
-              {fCo.length===0&&<div style={{color:"#c8d6e4",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noCompanies}</div>}
+              {fCo.map(co=>{const coD=dls.filter(d=>d.companyId===co.id);const coC=cts.filter(c=>c.companyId===co.id);const ch=(co.name.charCodeAt(0)*47)%360;return(<div key={co.id} style={{background:"#ffffff",border:"1px solid #d9e2ec",borderRadius:13,padding:16}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><div style={{width:38,height:38,borderRadius:9,background:`hsl(${ch},55%,14%)`,border:`1px solid hsl(${ch},55%,28%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:`hsl(${ch},75%,60%)`,marginBottom:9,fontFamily:"'Inter',Arial,sans-serif"}}>{co.name.charAt(0).toUpperCase()}</div><div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{co.name}</div>{co.industry&&<div style={{fontSize:11,color:"#64748b",marginTop:1}}>{co.industry}</div>}</div><div style={{display:"flex",gap:3}}><button onClick={()=>setModal({type:"company",data:co})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button><button onClick={()=>requestDelCo(co.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button></div></div><div style={{borderTop:"1px solid #d9e2ec",marginTop:11,paddingTop:9,display:"flex",flexDirection:"column",gap:4}}>{co.phone&&<div style={{fontSize:11,color:"#475569"}}>📞 {co.phone}</div>}{co.website&&<div style={{fontSize:11,color:"#003e7e",display:"flex",alignItems:"center",gap:3}}><Ic n="globe" s={10}/>{co.website}</div>}</div><div style={{display:"flex",gap:7,marginTop:9}}><span style={{fontSize:11,color:"#475569",background:"#f5f7fa",borderRadius:5,padding:"2px 7px"}}>💼 {coD.length} {t.dealsW}</span><span style={{fontSize:11,color:"#475569",background:"#f5f7fa",borderRadius:5,padding:"2px 7px"}}>👤 {coC.length} {t.contactsW}</span></div>{co.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:9,borderTop:"1px solid #d9e2ec",paddingTop:8,lineHeight:1.5}}>{co.notes}</div>}</div>);})}
+              {fCo.length===0&&<div style={{color:"#e2e8f0",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noCompanies}</div>}
             </div>
           )}
           {tab==="contacts"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(245px,1fr))",gap:11}}>
-              {fCt.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);const ch=(ct.name.charCodeAt(0)*83)%360;return(<div key={ct.id} style={{background:"#ffffff",border:"1px solid #b8d8eb",borderRadius:13,padding:16}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div style={{display:"flex",gap:10,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:"50%",background:`hsl(${ch},50%,13%)`,border:`1px solid hsl(${ch},50%,26%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:`hsl(${ch},70%,58%)`,flexShrink:0,fontFamily:"'DM Sans',Arial,sans-serif"}}>{ct.name.charAt(0).toUpperCase()}</div><div><div style={{fontSize:14,fontWeight:600,color:"#1a2a3a"}}>{ct.name}</div>{ct.titleF&&<div style={{fontSize:11,color:"#7c2b83",marginTop:1}}>{ct.titleF}</div>}{co&&<div style={{fontSize:11,color:"#6b7d8e",marginTop:1}}>🏢 {co.name}</div>}</div></div><div style={{display:"flex",gap:3,flexShrink:0}}><button onClick={()=>setModal({type:"contact",data:ct})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button><button onClick={()=>requestDelCt(ct.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button></div></div><div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>{ct.email&&<div style={{fontSize:11,color:"#5a6b7a"}}>✉️ {ct.email}</div>}{ct.phone&&<div style={{fontSize:11,color:"#5a6b7a"}}>📞 {ct.phone}</div>}{ct.linkedin&&<div style={{fontSize:11,color:"#003e7e",display:"flex",alignItems:"center",gap:3}}><Ic n="link" s={10}/><a href={ct.linkedin.startsWith('http')?ct.linkedin:`https://${ct.linkedin}`} target="_blank" rel="noopener noreferrer" style={{color:"#003e7e",textDecoration:"underline",wordBreak:"break-all"}}>{ct.linkedin}</a></div>}</div>{ct.notes&&<div style={{fontSize:11,color:"#6b7d8e",marginTop:9,borderTop:"1px solid #b8d8eb",paddingTop:8,lineHeight:1.5}}>{ct.notes}</div>}</div>);})}
-              {fCt.length===0&&<div style={{color:"#c8d6e4",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noContacts}</div>}
+              {fCt.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);const ch=(ct.name.charCodeAt(0)*83)%360;return(<div key={ct.id} style={{background:"#ffffff",border:"1px solid #d9e2ec",borderRadius:13,padding:16}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div style={{display:"flex",gap:10,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:"50%",background:`hsl(${ch},50%,13%)`,border:`1px solid hsl(${ch},50%,26%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:`hsl(${ch},70%,58%)`,flexShrink:0,fontFamily:"'Inter',Arial,sans-serif"}}>{ct.name.charAt(0).toUpperCase()}</div><div><div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{ct.name}</div>{ct.titleF&&<div style={{fontSize:11,color:"#7c2b83",marginTop:1}}>{ct.titleF}</div>}{co&&<div style={{fontSize:11,color:"#64748b",marginTop:1}}>🏢 {co.name}</div>}</div></div><div style={{display:"flex",gap:3,flexShrink:0}}><button onClick={()=>setModal({type:"contact",data:ct})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button><button onClick={()=>requestDelCt(ct.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button></div></div><div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>{ct.email&&<div style={{fontSize:11,color:"#475569"}}>✉️ {ct.email}</div>}{ct.phone&&<div style={{fontSize:11,color:"#475569"}}>📞 {ct.phone}</div>}{ct.linkedin&&<div style={{fontSize:11,color:"#003e7e",display:"flex",alignItems:"center",gap:3}}><Ic n="link" s={10}/><a href={ct.linkedin.startsWith('http')?ct.linkedin:`https://${ct.linkedin}`} target="_blank" rel="noopener noreferrer" style={{color:"#003e7e",textDecoration:"underline",wordBreak:"break-all"}}>{ct.linkedin}</a></div>}</div>{ct.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:9,borderTop:"1px solid #d9e2ec",paddingTop:8,lineHeight:1.5}}>{ct.notes}</div>}</div>);})}
+              {fCt.length===0&&<div style={{color:"#e2e8f0",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noContacts}</div>}
             </div>
           )}
           {tab==="prospecting"&&(
@@ -2256,10 +2261,10 @@ function AppInner(){
           {tab==="users"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:11}}>
               {fUs.map(u=>(
-                <div key={u.id} style={{background:"#ffffff",border:"1px solid #b8d8eb",borderRadius:13,padding:16}}>
+                <div key={u.id} style={{background:"#ffffff",border:"1px solid #d9e2ec",borderRadius:13,padding:16}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                     <div>
-                      <div style={{fontSize:14,fontWeight:600,color:"#1a2a3a"}}>{u.name}</div>
+                      <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{u.name}</div>
                       <div style={{fontSize:11,color:"#7c2b83",marginTop:1}}>@{u.alias}</div>
                     </div>
                     <div style={{display:"flex",gap:3}}>
@@ -2267,10 +2272,10 @@ function AppInner(){
                       <button onClick={()=>requestDelUsr(u.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button>
                     </div>
                   </div>
-                  <div style={{marginTop:8,fontSize:11,color:"#5a6b7a"}}>✉️ {u.email}</div>
+                  <div style={{marginTop:8,fontSize:11,color:"#475569"}}>✉️ {u.email}</div>
                 </div>
               ))}
-              {fUs.length===0&&<div style={{color:"#c8d6e4",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noUsers}</div>}
+              {fUs.length===0&&<div style={{color:"#e2e8f0",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noUsers}</div>}
             </div>
           )}
         </main>
