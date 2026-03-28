@@ -323,6 +323,13 @@ const PROSPECTING_ACTIVITY_TYPES = [
   { value:"otro", label:{ es:"Otro", en:"Other" } },
 ];
 
+const PROSPECTING_ACTIVITY_STATUSES = [
+  { value:"pendiente", label:{ es:"Pendiente", en:"Pending" } },
+  { value:"en_progreso", label:{ es:"En progreso", en:"In progress" } },
+  { value:"hecha", label:{ es:"Hecha", en:"Done" } },
+  { value:"bloqueada", label:{ es:"Bloqueada", en:"Blocked" } },
+];
+
 // ─── Storage helpers (Supabase with localStorage fallback) ────────────────────
 const STORAGE_KEY = "crm5_data";
 const uid = () => crypto.randomUUID();
@@ -1518,6 +1525,11 @@ function ProspectingBoard({ lang, users=[] }) {
     return found ? found.label[lang] : type;
   },[lang]);
 
+  const activityStatusLabel = useCallback((status)=>{
+    const found = PROSPECTING_ACTIVITY_STATUSES.find(s=>s.value===status);
+    return found ? found.label[lang] : (status || 'pendiente');
+  },[lang]);
+
   const loadProspecting = useCallback(async()=>{
     setLoading(true);
     if (!supabase) {
@@ -1607,6 +1619,7 @@ function ProspectingBoard({ lang, users=[] }) {
       company_id: payload.company_id || selectedCompanyId,
       contact_id: payload.contact_id || null,
       activity_type: payload.activity_type || 'investigacion',
+      status: payload.status || 'pendiente',
       activity_at: payload.activity_at || new Date().toISOString(),
       outcome: payload.outcome || null,
       next_step: payload.next_step || null,
@@ -1736,7 +1749,10 @@ function ProspectingBoard({ lang, users=[] }) {
                     return (
                       <div key={a.id} style={{background:'#f8fbfe',border:'1px solid #dce8f3',borderRadius:10,padding:'10px 11px'}}>
                         <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
-                          <div style={{fontSize:12,fontWeight:600}}>{activityTypeLabel(a.activity_type)} {ctc?`· ${ctc.name}`:''}</div>
+                          <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                            <div style={{fontSize:12,fontWeight:600}}>{activityTypeLabel(a.activity_type)} {ctc?`· ${ctc.name}`:''}</div>
+                            <span style={{fontSize:10,padding:'2px 7px',borderRadius:999,border:'1px solid #d6e3f0',background:'#eef4fa',color:'#4a5a6a'}}>{activityStatusLabel(a.status || 'pendiente')}</span>
+                          </div>
                           <div style={{display:'flex',alignItems:'center',gap:6}}>
                             <div style={{fontSize:10,color:'#6b7d8e',fontFamily:"'JetBrains Mono',monospace"}}>{String(a.activity_at||'').slice(0,16).replace('T',' ')}</div>
                             <button title="Borrar actividad" onClick={()=>deleteActivity(a.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:2,opacity:.7}}><Ic n="trash" s={12}/></button>
@@ -1849,11 +1865,12 @@ function ProspectingContactForm({ init={}, onSave, onClose }){
 }
 
 function ProspectingActivityForm({ init={}, onSave, onClose, contacts=[], users=[], lang }){
-  const [f, setF] = useState({ company_id:'', contact_id:'', activity_type:'investigacion', activity_at:new Date().toISOString().slice(0,16), outcome:'', next_step:'', next_action_at:'', owner_id:'', notes:'', attachment_url:'', ...init });
+  const [f, setF] = useState({ company_id:'', contact_id:'', activity_type:'investigacion', status:'pendiente', activity_at:new Date().toISOString().slice(0,16), outcome:'', next_step:'', next_action_at:'', owner_id:'', notes:'', attachment_url:'', ...init });
   const s = k => e => setF(p=>({ ...p, [k]: e.target.value }));
   return (
     <>
       <Sel label="Tipo" value={f.activity_type} onChange={s('activity_type')} opts={PROSPECTING_ACTIVITY_TYPES.map(st=>({ v:st.value, l:st.label[lang] }))} />
+      <Sel label="Estado" value={f.status || 'pendiente'} onChange={s('status')} opts={PROSPECTING_ACTIVITY_STATUSES.map(st=>({ v:st.value, l:st.label[lang] }))} />
       <Sel label="Contacto" value={f.contact_id || ''} onChange={s('contact_id')} opts={[{v:'',l:'Solo empresa'}, ...contacts.map(c=>({ v:c.id, l:c.name }))]} />
       <Inp label="Fecha/hora" type="datetime-local" value={String(f.activity_at || '').slice(0,16)} onChange={s('activity_at')} />
       <Inp label="Resultado" value={f.outcome || ''} onChange={s('outcome')} />

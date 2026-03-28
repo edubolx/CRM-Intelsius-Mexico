@@ -133,3 +133,73 @@ do $$ begin
     create policy "allow_all_crm_users" on crm_users for all using (true) with check (true);
   end if;
 end $$;
+
+-- 8. Prospecting (independent from pipeline data)
+create table if not exists prospecting_companies (
+  id           text primary key default gen_random_uuid()::text,
+  name         text not null,
+  status       text not null default 'nueva',
+  owner_id     text,
+  industry     text,
+  country      text,
+  company_size text,
+  lead_source  text,
+  priority     text,
+  notes        text,
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now()
+);
+
+create table if not exists prospecting_contacts (
+  id           text primary key default gen_random_uuid()::text,
+  company_id   text not null references prospecting_companies(id) on delete cascade,
+  name         text not null,
+  title        text,
+  email        text,
+  phone        text,
+  linkedin_url text,
+  notes        text,
+  is_archived  boolean default false,
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now()
+);
+
+create table if not exists prospecting_activities (
+  id             text primary key default gen_random_uuid()::text,
+  company_id     text not null references prospecting_companies(id) on delete cascade,
+  contact_id     text references prospecting_contacts(id) on delete set null,
+  activity_type  text not null default 'investigacion',
+  status         text not null default 'pendiente',
+  activity_at    timestamptz not null default now(),
+  outcome        text,
+  next_step      text,
+  next_action_at date,
+  owner_id       text,
+  notes          text,
+  attachment_url text,
+  created_at     timestamptz default now(),
+  updated_at     timestamptz default now()
+);
+
+alter table prospecting_companies enable row level security;
+alter table prospecting_contacts enable row level security;
+alter table prospecting_activities enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='prospecting_companies' and policyname='allow_all_prospecting_companies') then
+    create policy "allow_all_prospecting_companies" on prospecting_companies for all using (true) with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='prospecting_contacts' and policyname='allow_all_prospecting_contacts') then
+    create policy "allow_all_prospecting_contacts" on prospecting_contacts for all using (true) with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='prospecting_activities' and policyname='allow_all_prospecting_activities') then
+    create policy "allow_all_prospecting_activities" on prospecting_activities for all using (true) with check (true);
+  end if;
+end $$;
+
+alter table prospecting_activities add column if not exists status text not null default 'pendiente';
+
+create index if not exists idx_prospecting_contacts_company on prospecting_contacts(company_id);
+create index if not exists idx_prospecting_activities_company on prospecting_activities(company_id);
+create index if not exists idx_prospecting_activities_contact on prospecting_activities(contact_id);
+create index if not exists idx_prospecting_activities_next_action on prospecting_activities(next_action_at);
