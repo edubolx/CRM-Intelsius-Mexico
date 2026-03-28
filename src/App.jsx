@@ -1255,7 +1255,7 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
 
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         {cards.map(s=>(
-          <div key={s.k} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:12,padding:"10px 16px",flex:1,minWidth:130}}>
+          <div key={s.k} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:12,padding:"10px 16px",flex:1,minWidth:130,boxShadow:'0 1px 6px rgba(15,23,42,.05)'}}>
             <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
             <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'Inter',Arial,sans-serif"}}>{s.v}</div>
           </div>
@@ -1264,7 +1264,7 @@ function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
 
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {rows.map(a=>(
-          <div key={a.id} onClick={()=>onOpenActivity(a.dealId)} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:10,padding:"10px 12px",cursor:"pointer"}}>
+          <div key={a.id} onClick={()=>onOpenActivity(a.dealId)} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:10,padding:"10px 12px",cursor:"pointer",boxShadow:'0 1px 6px rgba(15,23,42,.05)'}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
               <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
                 <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#f5f7fa",border:"1px solid #cfd8e3",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
@@ -1410,7 +1410,7 @@ const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit
     <div style={{zoom}}>
       <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
         {[{l:t.pipelineTotal,v:fv(pipe,currency),c:"#27aae1"},{l:t.closedWon,v:fv(won,currency),c:"#22c55e"},{l:t.totalDeals,v:deals.length,c:"#7c2b83"}].map(s=>(
-          <div key={s.l} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:12,padding:"10px 16px",flex:1,minWidth:120}}>
+          <div key={s.l} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:12,padding:"10px 16px",flex:1,minWidth:120,boxShadow:'0 1px 6px rgba(15,23,42,.05)'}}>
             <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
             <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'Inter',Arial,sans-serif"}}>{s.v}</div>
           </div>
@@ -1704,7 +1704,7 @@ function ProspectingBoard({ lang, users=[] }) {
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,alignItems:'start'}}>
-        <div style={{background:'#fff',border:'1px solid #cfd8e3',borderRadius:12,overflow:'hidden'}}>
+        <div style={{background:'#fff',border:'1px solid #cfd8e3',borderRadius:12,overflow:'hidden',boxShadow:'0 2px 10px rgba(15,23,42,.06)'}}>
           <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:8,padding:'10px 12px',fontSize:10,color:'#64748b',fontFamily:"'JetBrains Mono',monospace",textTransform:'uppercase'}}>
             <div>Empresa</div><div>Estado</div><div>Owner</div><div>Próx. acción</div>
           </div>
@@ -1727,7 +1727,7 @@ function ProspectingBoard({ lang, users=[] }) {
           </div>
         </div>
 
-        <div style={{background:'#fff',border:'1px solid #cfd8e3',borderRadius:12,minHeight:520,padding:12}}>
+        <div style={{background:'#fff',border:'1px solid #cfd8e3',borderRadius:12,minHeight:520,padding:12,boxShadow:'0 2px 10px rgba(15,23,42,.06)'}}>
           {!selectedCompany ? (
             <div style={{fontSize:12,color:'#94a3b8'}}>Selecciona una empresa para ver detalle.</div>
           ) : (
@@ -2242,13 +2242,13 @@ function AppInner(){
           )}
           {tab==="companies"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:11}}>
-              {fCo.map(co=>{const coD=dls.filter(d=>d.companyId===co.id);const coC=cts.filter(c=>c.companyId===co.id);const ch=(co.name.charCodeAt(0)*47)%360;return(<div key={co.id} style={{background:"#ffffff",border:"1px solid #cbd5e1",borderRadius:13,padding:16}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><div style={{width:38,height:38,borderRadius:9,background:`hsl(${ch},55%,14%)`,border:`1px solid hsl(${ch},55%,28%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:`hsl(${ch},75%,60%)`,marginBottom:9,fontFamily:"'Inter',Arial,sans-serif"}}>{co.name.charAt(0).toUpperCase()}</div><div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{co.name}</div>{co.industry&&<div style={{fontSize:11,color:"#64748b",marginTop:1}}>{co.industry}</div>}</div><div style={{display:"flex",gap:3}}><button onClick={()=>setModal({type:"company",data:co})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button><button onClick={()=>requestDelCo(co.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button></div></div><div style={{borderTop:"1px solid #cbd5e1",marginTop:11,paddingTop:9,display:"flex",flexDirection:"column",gap:4}}>{co.phone&&<div style={{fontSize:11,color:"#475569"}}>📞 {co.phone}</div>}{co.website&&<div style={{fontSize:11,color:"#003e7e",display:"flex",alignItems:"center",gap:3}}><Ic n="globe" s={10}/>{co.website}</div>}</div><div style={{display:"flex",gap:7,marginTop:9}}><span style={{fontSize:11,color:"#475569",background:"#f5f7fa",borderRadius:5,padding:"2px 7px"}}>💼 {coD.length} {t.dealsW}</span><span style={{fontSize:11,color:"#475569",background:"#f5f7fa",borderRadius:5,padding:"2px 7px"}}>👤 {coC.length} {t.contactsW}</span></div>{co.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:9,borderTop:"1px solid #cbd5e1",paddingTop:8,lineHeight:1.5}}>{co.notes}</div>}</div>);})}
+              {fCo.map(co=>{const coD=dls.filter(d=>d.companyId===co.id);const coC=cts.filter(c=>c.companyId===co.id);const ch=(co.name.charCodeAt(0)*47)%360;return(<div key={co.id} style={{background:"#ffffff",border:"1px solid #cbd5e1",borderRadius:13,padding:16,boxShadow:'0 2px 10px rgba(15,23,42,.06)'}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><div style={{width:38,height:38,borderRadius:9,background:`hsl(${ch},55%,14%)`,border:`1px solid hsl(${ch},55%,28%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:`hsl(${ch},75%,60%)`,marginBottom:9,fontFamily:"'Inter',Arial,sans-serif"}}>{co.name.charAt(0).toUpperCase()}</div><div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{co.name}</div>{co.industry&&<div style={{fontSize:11,color:"#64748b",marginTop:1}}>{co.industry}</div>}</div><div style={{display:"flex",gap:3}}><button onClick={()=>setModal({type:"company",data:co})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button><button onClick={()=>requestDelCo(co.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button></div></div><div style={{borderTop:"1px solid #cbd5e1",marginTop:11,paddingTop:9,display:"flex",flexDirection:"column",gap:4}}>{co.phone&&<div style={{fontSize:11,color:"#475569"}}>📞 {co.phone}</div>}{co.website&&<div style={{fontSize:11,color:"#003e7e",display:"flex",alignItems:"center",gap:3}}><Ic n="globe" s={10}/>{co.website}</div>}</div><div style={{display:"flex",gap:7,marginTop:9}}><span style={{fontSize:11,color:"#475569",background:"#f5f7fa",borderRadius:5,padding:"2px 7px"}}>💼 {coD.length} {t.dealsW}</span><span style={{fontSize:11,color:"#475569",background:"#f5f7fa",borderRadius:5,padding:"2px 7px"}}>👤 {coC.length} {t.contactsW}</span></div>{co.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:9,borderTop:"1px solid #cbd5e1",paddingTop:8,lineHeight:1.5}}>{co.notes}</div>}</div>);})}
               {fCo.length===0&&<div style={{color:"#cfd8e3",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noCompanies}</div>}
             </div>
           )}
           {tab==="contacts"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(245px,1fr))",gap:11}}>
-              {fCt.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);const ch=(ct.name.charCodeAt(0)*83)%360;return(<div key={ct.id} style={{background:"#ffffff",border:"1px solid #cbd5e1",borderRadius:13,padding:16}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div style={{display:"flex",gap:10,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:"50%",background:`hsl(${ch},50%,13%)`,border:`1px solid hsl(${ch},50%,26%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:`hsl(${ch},70%,58%)`,flexShrink:0,fontFamily:"'Inter',Arial,sans-serif"}}>{ct.name.charAt(0).toUpperCase()}</div><div><div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{ct.name}</div>{ct.titleF&&<div style={{fontSize:11,color:"#7c2b83",marginTop:1}}>{ct.titleF}</div>}{co&&<div style={{fontSize:11,color:"#64748b",marginTop:1}}>🏢 {co.name}</div>}</div></div><div style={{display:"flex",gap:3,flexShrink:0}}><button onClick={()=>setModal({type:"contact",data:ct})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button><button onClick={()=>requestDelCt(ct.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button></div></div><div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>{ct.email&&<div style={{fontSize:11,color:"#475569"}}>✉️ {ct.email}</div>}{ct.phone&&<div style={{fontSize:11,color:"#475569"}}>📞 {ct.phone}</div>}{ct.linkedin&&<div style={{fontSize:11,color:"#003e7e",display:"flex",alignItems:"center",gap:3}}><Ic n="link" s={10}/><a href={ct.linkedin.startsWith('http')?ct.linkedin:`https://${ct.linkedin}`} target="_blank" rel="noopener noreferrer" style={{color:"#003e7e",textDecoration:"underline",wordBreak:"break-all"}}>{ct.linkedin}</a></div>}</div>{ct.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:9,borderTop:"1px solid #cbd5e1",paddingTop:8,lineHeight:1.5}}>{ct.notes}</div>}</div>);})}
+              {fCt.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);const ch=(ct.name.charCodeAt(0)*83)%360;return(<div key={ct.id} style={{background:"#ffffff",border:"1px solid #cbd5e1",borderRadius:13,padding:16,boxShadow:'0 2px 10px rgba(15,23,42,.06)'}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div style={{display:"flex",gap:10,alignItems:"flex-start"}}><div style={{width:40,height:40,borderRadius:"50%",background:`hsl(${ch},50%,13%)`,border:`1px solid hsl(${ch},50%,26%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:`hsl(${ch},70%,58%)`,flexShrink:0,fontFamily:"'Inter',Arial,sans-serif"}}>{ct.name.charAt(0).toUpperCase()}</div><div><div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{ct.name}</div>{ct.titleF&&<div style={{fontSize:11,color:"#7c2b83",marginTop:1}}>{ct.titleF}</div>}{co&&<div style={{fontSize:11,color:"#64748b",marginTop:1}}>🏢 {co.name}</div>}</div></div><div style={{display:"flex",gap:3,flexShrink:0}}><button onClick={()=>setModal({type:"contact",data:ct})} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:3,opacity:.7}}><Ic n="edit" s={12}/></button><button onClick={()=>requestDelCt(ct.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:3,opacity:.65}}><Ic n="trash" s={12}/></button></div></div><div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>{ct.email&&<div style={{fontSize:11,color:"#475569"}}>✉️ {ct.email}</div>}{ct.phone&&<div style={{fontSize:11,color:"#475569"}}>📞 {ct.phone}</div>}{ct.linkedin&&<div style={{fontSize:11,color:"#003e7e",display:"flex",alignItems:"center",gap:3}}><Ic n="link" s={10}/><a href={ct.linkedin.startsWith('http')?ct.linkedin:`https://${ct.linkedin}`} target="_blank" rel="noopener noreferrer" style={{color:"#003e7e",textDecoration:"underline",wordBreak:"break-all"}}>{ct.linkedin}</a></div>}</div>{ct.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:9,borderTop:"1px solid #cbd5e1",paddingTop:8,lineHeight:1.5}}>{ct.notes}</div>}</div>);})}
               {fCt.length===0&&<div style={{color:"#cfd8e3",padding:40,fontFamily:"'JetBrains Mono',monospace",fontSize:12,gridColumn:"1/-1",textAlign:"center"}}>{t.noContacts}</div>}
             </div>
           )}
@@ -2261,7 +2261,7 @@ function AppInner(){
           {tab==="users"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:11}}>
               {fUs.map(u=>(
-                <div key={u.id} style={{background:"#ffffff",border:"1px solid #cbd5e1",borderRadius:13,padding:16}}>
+                <div key={u.id} style={{background:"#ffffff",border:"1px solid #cbd5e1",borderRadius:13,padding:16,boxShadow:'0 2px 10px rgba(15,23,42,.06)'}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                     <div>
                       <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{u.name}</div>
