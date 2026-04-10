@@ -1189,7 +1189,7 @@ function AppInner(){
       const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
       ensureSbOk(res, 'save deal');
     });
-    if(!ok) return { ok:false, message: saveMessage || 'No se pudo guardar el deal' };
+    if(!ok) return { ok:false, message: 'No se pudo guardar el deal' };
     setDls(p=>f.id?p.map(d=>d.id===row.id?row:d):[...p,row]);
     if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
     return { ok:true, id: row.id };
