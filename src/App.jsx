@@ -1150,7 +1150,17 @@ function AppInner(){
   };
 
   const saveCo=async f=>{
-    const row = { ...(f.id?f:{...f,id:uid()}) };
+    const normalizedName = (f.name || '').trim();
+    if(!normalizedName) return;
+
+    const existingSameName = cos.find(c =>
+      c.id !== f.id &&
+      (c.name || '').trim().toLowerCase() === normalizedName.toLowerCase()
+    );
+
+    const targetId = existingSameName?.id || f.id || uid();
+    const row = { ...f, id: targetId, name: normalizedName };
+
     const ok = await withSaveStatus(async()=>{
       const res = await supabase.from('companies').upsert([{ id:row.id, name:row.name, industry:row.industry||"", website:row.website||"", phone:row.phone||"", notes:row.notes||"" }], { onConflict:'id' });
       ensureSbOk(res, 'save company');
