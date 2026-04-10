@@ -1383,12 +1383,6 @@ function AppInner(){
       ensureSbOk(res, 'add deal activity');
     });
     if(!ok) return false;
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]),row]}:d));
-    setViewDeal(p=>{
-      if(!p || p.id!==dealId) return p;
-      const currentActivities = Array.isArray(p.activities) ? p.activities : [];
-      return {...p,activities:[...currentActivities,row]};
-    });
     return true;
   };
   const deleteActivity=async(dealId, activityId)=>{
