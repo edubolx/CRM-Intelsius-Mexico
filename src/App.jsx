@@ -1190,7 +1190,6 @@ function AppInner(){
       ensureSbOk(res, 'save deal');
     });
     if(!ok) return { ok:false, message: 'No se pudo guardar el deal' };
-    setDls(p=>f.id?p.map(d=>d.id===row.id?row:d):[...p,row]);
     if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
     return { ok:true, id: row.id };
   };
