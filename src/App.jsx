@@ -10,11 +10,12 @@ import ProspectingBoard from './components/prospecting/ProspectingBoard.jsx'
 import ProspectingCompanyForm from './components/prospecting/ProspectingCompanyForm.jsx'
 import ProspectingContactForm from './components/prospecting/ProspectingContactForm.jsx'
 import ProspectingActivityForm from './components/prospecting/ProspectingActivityForm.jsx'
+import ProjectionsView from './components/projections/ProjectionsView.jsx'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
   es: {
-    appName:"CRM Intelsius México", pipeline:"Pipeline", companies:"Empresas", contacts:"Contactos", usersTab:"Usuarios",
+    appName:"CRM Intelsius México", pipeline:"Pipeline", companies:"Empresas", contacts:"Contactos", usersTab:"Usuarios", projections:"Proyecciones",
     newDeal:"Deal", newCompany:"Empresa", newContact:"Contacto",
     editDeal:"Editar Deal", newDealTitle:"Nuevo Deal",
     editCompany:"Editar Empresa", newCompanyTitle:"Nueva Empresa",
@@ -100,7 +101,7 @@ const T = {
          titleF:"CEO, Director...", linkedin:"linkedin.com/in/...", dealName:"Ej. Enterprise Deal" },
   },
   en: {
-    appName:"CRM Intelsius México", pipeline:"Pipeline", companies:"Companies", contacts:"Contacts", usersTab:"Users",
+    appName:"CRM Intelsius México", pipeline:"Pipeline", companies:"Companies", contacts:"Contacts", usersTab:"Users", projections:"Projections",
     newDeal:"Deal", newCompany:"Company", newContact:"Contact",
     editDeal:"Edit Deal", newDealTitle:"New Deal",
     editCompany:"Edit Company", newCompanyTitle:"New Company",
@@ -1464,7 +1465,7 @@ function AppInner(){
   const fDl=useMemo(()=>dls.filter(d=>d.name.toLowerCase().includes(ql)),[dls,ql]);
   const fUs=useMemo(()=>users.filter(u=>u.name.toLowerCase().includes(ql)||u.alias?.toLowerCase().includes(ql)||u.email?.toLowerCase().includes(ql)),[users,ql]);
 
-  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
+  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"projections",l:t.projections,i:"chart"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
   const addL=tab==="deals"?t.newDeal:tab==="companies"?t.newCompany:tab==="contacts"?t.newContact:tab==="users"?t.newUser:null;
   const addT=tab==="deals"?"deal":tab==="companies"?"company":tab==="contacts"?"contact":tab==="users"?"user":null;
 
@@ -1586,6 +1587,14 @@ function AppInner(){
                 ProspectingContactForm: (props) => <ProspectingContactForm {...props} helpers={{ Inp, Txta, Btn }} />,
                 ProspectingActivityForm: (props) => <ProspectingActivityForm {...props} helpers={{ Inp, Sel, Txta, Btn, PROSPECTING_ACTIVITY_TYPES, PROSPECTING_ACTIVITY_STATUSES }} />,
               }}
+            />
+          )}
+          {tab==="projections"&&(
+            <ProjectionsView
+              lang={lang}
+              deals={dls}
+              stages={stages}
+              currency={currency}
             />
           )}
           {tab==="activities"&&(
