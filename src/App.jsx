@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import Papa from "papaparse";
 import { supabase } from './supabaseClient.js'
 import { CRMProvider, useCRM } from './state/CRMContext.jsx'
+import ActivitiesPanel from './components/activities/ActivitiesPanel.jsx'
+import ActivitiesDashboard from './components/activities/ActivitiesDashboard.jsx'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -1019,188 +1021,6 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
   );
 }
 
-function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateActivityStatus,onUpdateActivity}){
-  const makeEmptyForm = () => ({ type:"task", title:"", dueDate:today(), responsible:"", status:"pending", comment:"" });
-  const [form, setForm] = useState(makeEmptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [localError, setLocalError] = useState("");
-  const setF = (k,v) => setForm(p=>({...p,[k]:v}));
-
-  const typeOpts = ACTIVITY_TYPES.map(v=>({v,l:t[v]}));
-  const statusOpts = ACTIVITY_STATUSES.map(v=>({v,l:t[v]}));
-
-  const resetForm = () => { setForm(makeEmptyForm()); setEditingId(null); };
-
-  const handleSave = async () => {
-    if(!form.title?.trim() || saving) return;
-    setLocalError("");
-    setSaving(true);
-    try {
-      if(editingId){
-        const ok = await onUpdateActivity(editingId, {...form, title: form.title.trim()});
-        if(!ok){ setLocalError('No se pudo guardar la actividad.'); return; }
-        resetForm();
-        return;
-      }
-      const nowIso = new Date().toISOString();
-      const ok = await onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: nowIso, updatedAt: nowIso, completedAt: form.status === "done" ? nowIso : null });
-      if(!ok){ setLocalError('No se pudo guardar la actividad.'); return; }
-      resetForm();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const startEdit = (a) => {
-    setEditingId(a.id);
-    setForm({
-      type:a.type||"task",
-      title:a.title||"",
-      dueDate:a.dueDate||today(),
-      responsible:a.responsible||"",
-      status:a.status||"pending",
-      comment:a.comment||"",
-    });
-  };
-
-  return (
-    <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:8,marginBottom:10}}>
-        <Sel label={t.activityType} value={form.type} onChange={e=>setF("type",e.target.value)} opts={typeOpts}/>
-        <Inp label={t.activityTitle+" *"} value={form.title} onChange={e=>setF("title",e.target.value)} />
-        <Inp label={t.activityDueDate} type="date" value={form.dueDate} onChange={e=>setF("dueDate",e.target.value)} />
-        <Sel label={t.activityResponsible} value={form.responsible} onChange={e=>setF("responsible",e.target.value)} opts={[{v:"",l:t.selectOpt},...(users||[]).map(u=>({v:u.alias||u.name,l:`${u.alias||u.name} (${u.name})`}))]} />
-        <Sel label={t.activityStatus} value={form.status} onChange={e=>setF("status",e.target.value)} opts={statusOpts}/>
-      </div>
-      <Txta label={t.activityComment} value={form.comment} onChange={e=>setF("comment",e.target.value)} />
-      <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:8}}>
-        {editingId && <Btn v="ghost" ch={t.cancel} onClick={resetForm}/>}        
-        <Btn ch={<><Ic n={editingId?"check":"plus"} s={12}/>{saving ? (t.saving || 'Guardando...') : (editingId?t.activityUpdate:t.addActivity)}</>} onClick={handleSave} disabled={saving} sx={{opacity:saving?0.65:1,pointerEvents:saving?'none':'auto'}}/>
-      </div>
-      {localError && <div style={{marginTop:8,fontSize:11,color:'#ef4444',fontFamily:"'JetBrains Mono',monospace"}}>{localError}</div>}
-
-      <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
-        {(!(deal.activities||[]).length) && (
-          <div style={{fontSize:11,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace"}}>{t.noActivities}</div>
-        )}
-        {[...(deal.activities||[])].sort((a,b)=>(a.dueDate||"").localeCompare(b.dueDate||"")).map(a=>(
-          <div key={a.id} style={{background:"#f5f7fa",border:"1px solid #cfd8e3",borderRadius:10,padding:"9px 10px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-              <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
-                <span style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{a.title}</span>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <select value={a.status} onChange={e=>onUpdateActivityStatus(a.id,e.target.value)} style={{...iSx,padding:"3px 6px",fontSize:11,width:120}}>
-                  {statusOpts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
-                </select>
-                <button title={t.activityEdit} onClick={()=>startEdit(a)} style={{background:"none",border:"none",color:"#003e7e",cursor:"pointer",padding:2}}><Ic n="edit" s={12}/></button>
-                <button title={t.deleteBtn} onClick={()=>onDeleteActivity(a.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:2}}><Ic n="trash" s={12}/></button>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
-              {a.dueDate && <span style={{fontSize:10,color:"#475569",fontFamily:"'JetBrains Mono',monospace"}}>📅 {a.dueDate}</span>}
-              {a.responsible && <span style={{fontSize:10,color:"#475569"}}>👤 {a.responsible}</span>}
-            </div>
-            {a.comment && <div style={{fontSize:11,color:"#64748b",marginTop:4,lineHeight:1.5}}>{a.comment}</div>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ActivitiesDashboard({dls,t,onUpdateActivityStatus,onOpenActivity}){
-  const [filter, setFilter] = useState("all");
-  const [responsibleFilter, setResponsibleFilter] = useState("all");
-  const all = dls.flatMap(d => (d.activities||[]).map(a=>({...a,dealId:d.id,dealName:d.name})));
-  const responsibleOptions = [...new Set(all.map(a => (a.responsible || "").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  const base = responsibleFilter === "all" ? all : all.filter(a => (a.responsible || "").trim() === responsibleFilter);
-  const now = new Date();
-  const todayS = today();
-  const weekStart = startOfWeek(now);
-  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate()+7);
-
-  const parseDateSafe = (v) => {
-    if (!v) return null;
-    const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00`) : new Date(v);
-    return Number.isNaN(d.getTime()) ? null : d;
-  };
-  const inCurrentWeek = (v) => {
-    const d = parseDateSafe(v);
-    return !!d && d >= weekStart && d < weekEnd;
-  };
-
-  const pending = base.filter(a=>a.status!=="done");
-  const overdue = pending.filter(a=>a.dueDate && a.dueDate < todayS);
-  const dueSoon = pending.filter(a=>a.dueDate && a.dueDate >= todayS && a.dueDate <= new Date(now.getTime()+7*86400000).toISOString().slice(0,10));
-  const completedWeek = base.filter(a=>a.status==="done" && [a.completedAt, a.updatedAt, a.createdAt, a.dueDate].some(inCurrentWeek));
-
-  const lists = { all: base, pending, overdue, dueSoon, completedWeek };
-  const rows = lists[filter] || base;
-  const statusOpts = ACTIVITY_STATUSES.map(v=>({v,l:t[v]}));
-
-  const cards = [
-    {k:"pending",l:t.pending,v:pending.length,c:"#27aae1"},
-    {k:"overdue",l:t.overdue,v:overdue.length,c:"#ef4444"},
-    {k:"dueSoon",l:t.dueSoon,v:dueSoon.length,c:"#f59e0b"},
-    {k:"completedWeek",l:t.completedWeek,v:completedWeek.length,c:"#22c55e"},
-  ];
-
-  return (
-    <div>
-      <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        <button onClick={()=>setFilter("all")} style={{background:filter==="all"?"#003e7e":"#ffffff",color:filter==="all"?"#fff":"#334155",border:"1px solid #cbd5e1",borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{t.all} ({base.length})</button>
-        {cards.map(s=>(
-          <button key={s.k} onClick={()=>setFilter(s.k)} style={{background:filter===s.k?s.c+"22":"#ffffff",color:filter===s.k?s.c:"#334155",border:`1px solid ${filter===s.k?s.c:"#cbd5e1"}`,borderRadius:9,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>
-            {s.l} ({s.v})
-          </button>
-        ))}
-        <div style={{marginLeft:"auto",minWidth:220}}>
-          <Sel
-            label={t.activityResponsible}
-            value={responsibleFilter}
-            onChange={e=>setResponsibleFilter(e.target.value)}
-            opts={[{v:"all",l:t.allResponsibles||"All"}, ...responsibleOptions.map(r=>({v:r,l:r}))]}
-          />
-        </div>
-      </div>
-
-      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
-        {cards.map(s=>(
-          <div key={s.k} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:12,padding:"10px 16px",flex:1,minWidth:130,boxShadow:'0 4px 12px rgba(15,23,42,.10)'}}>
-            <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
-            <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'Inter',Arial,sans-serif"}}>{s.v}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {rows.map(a=>(
-          <div key={a.id} onClick={()=>onOpenActivity(a.dealId)} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:10,padding:"10px 12px",cursor:"pointer",boxShadow:'0 4px 12px rgba(15,23,42,.10)'}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-              <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",background:"#f5f7fa",border:"1px solid #cfd8e3",borderRadius:5,padding:"2px 6px"}}>{t[a.type]||a.type}</span>
-                <span style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{a.title}</span>
-                <span style={{fontSize:10,color:"#003e7e",fontFamily:"'JetBrains Mono',monospace",background:"#eaf3ff",border:"1px solid #cbd5e1",borderRadius:5,padding:"2px 6px"}}>Deal: {a.dealName}</span>
-              </div>
-              <select value={a.status} onClick={e=>e.stopPropagation()} onChange={e=>onUpdateActivityStatus(a.dealId,a.id,e.target.value)} style={{...iSx,padding:"3px 6px",fontSize:11,width:140}}>
-                {statusOpts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
-              </select>
-            </div>
-            <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
-              {a.dueDate && <span style={{fontSize:10,color:"#475569",fontFamily:"'JetBrains Mono',monospace"}}>📅 {a.dueDate}</span>}
-              {a.responsible && <span style={{fontSize:10,color:"#475569"}}>👤 {a.responsible}</span>}
-            </div>
-            {a.comment && <div style={{fontSize:11,color:"#64748b",marginTop:4,lineHeight:1.5}}>{a.comment}</div>}
-          </div>
-        ))}
-        {!rows.length && <div style={{fontSize:11,color:"#94a3b8"}}>{t.noActivities}</div>}
-      </div>
-    </div>
-  );
-}
 
 // ─── Deal Detail Modal ────────────────────────────────────────────────────────
 function DealDetailModal({deal, cos, cts, users, lang, currency, stages, t, onSaveEval, onDeleteEval, onAddActivity, onDeleteActivity, onUpdateActivityStatus, onUpdateActivity, onEditDeal, onClose}){
@@ -1258,6 +1078,7 @@ function DealDetailModal({deal, cos, cts, users, lang, currency, stages, t, onSa
           onDeleteActivity={onDeleteActivity}
           onUpdateActivityStatus={onUpdateActivityStatus}
           onUpdateActivity={onUpdateActivity}
+          helpers={{ today, uid, ACTIVITY_TYPES, ACTIVITY_STATUSES, Sel, Inp, Txta, Btn, Ic, iSx }}
         />
       )}
     </Modal>
@@ -2271,7 +2092,13 @@ function AppInner(){
             <ProspectingBoard lang={lang} users={users} />
           )}
           {tab==="activities"&&(
-            <ActivitiesDashboard dls={dls} t={t} onUpdateActivityStatus={updateActivityStatus} onOpenActivity={openDealActivities}/>
+            <ActivitiesDashboard
+              dls={dls}
+              t={t}
+              onUpdateActivityStatus={updateActivityStatus}
+              onOpenActivity={openDealActivities}
+              helpers={{ today, startOfWeek, ACTIVITY_STATUSES, Sel, iSx }}
+            />
           )}
           {tab==="users"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:11}}>
