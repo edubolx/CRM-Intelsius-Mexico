@@ -1037,6 +1037,8 @@ function CtForm({init={},cos,t,onSave,onClose}){const[f,setF]=useState({name:"",
 function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
   const defaultStage=stages[0]?.name||"";
   const [f,setF]=useState({name:"",value:0,stage:defaultStage,companyId:"",contactId:"",leadSource:"",leadSourceCustom:"",closingDate:"",notes:"",...init});
+  const [submitState,setSubmitState]=useState("idle");
+  const [submitMessage,setSubmitMessage]=useState("");
   const s=k=>e=>setF(p=>{
     const val = e.target.value;
     if(k==="companyId"){
@@ -1051,6 +1053,26 @@ function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
   const stOpts=stages.map(st=>({v:st.name,l:st.name}));
   const sourceOpts=[{v:"",l:t.selectOpt},...LEAD_SOURCES.map(x=>({v:x,l:x}))];
 
+  const handleSave = async () => {
+    if(!f.name || submitState === "saving") return;
+    setSubmitState("saving");
+    setSubmitMessage("Guardando...");
+    try {
+      const result = await onSave(f);
+      if(result === false){
+        setSubmitState("error");
+        setSubmitMessage("No se pudo guardar el deal");
+        return;
+      }
+      setSubmitState("saved");
+      setSubmitMessage("Deal guardado ✓");
+      setTimeout(()=>{ setSubmitState("idle"); setSubmitMessage(""); }, 1500);
+    } catch {
+      setSubmitState("error");
+      setSubmitMessage("No se pudo guardar el deal");
+    }
+  };
+
   return <>
     <Inp label={t.dealName+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.dealName}/>
     <Inp label={`${t.value} (${currency})`} type="number" value={f.value} onChange={s("value")}/>
@@ -1063,9 +1085,14 @@ function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
     )}
     <Inp label={t.closingDate} type="date" value={f.closingDate} onChange={s("closingDate")}/>
     <Txta label={t.notes} value={f.notes} onChange={s("notes")}/>
-    <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}>
-      <Btn v="ghost" ch={t.cancel} onClick={onClose}/>
-      <Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginTop:6}}>
+      <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:submitState==="error"?"#ef4444":submitState==="saved"?"#22c55e":"#64748b",minHeight:16}}>
+        {submitMessage}
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <Btn v="ghost" ch={t.cancel} onClick={onClose}/>
+        <Btn ch={submitState==="saving" ? "Guardando..." : t.save} onClick={handleSave}/>
+      </div>
     </div>
   </>;
 }
@@ -1158,10 +1185,11 @@ function AppInner(){
       const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
       ensureSbOk(res, 'save deal');
     });
-    if(!ok) return;
+    if(!ok) return false;
     setDls(p=>f.id?p.map(d=>d.id===row.id?row:d):[...p,row]);
     setModal(null);
     if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
+    return true;
   };
   const chStage=(id,stage)=>setDls(p=>p.map(d=>d.id===id?{...d,stage}:d));
 
