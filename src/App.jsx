@@ -556,6 +556,7 @@ function CRMProvider({ children }) {
   const [data, dispatch] = useReducer(crmReducer, initialDataState);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("idle");
+  const [saveMessage, setSaveMessage] = useState("");
   const initialLoadDone = useRef(false);
   const canAutoSave = useRef(true);
   const saveQueue = useRef(Promise.resolve());
@@ -593,7 +594,7 @@ function CRMProvider({ children }) {
   },[data]);
 
   const ctx = useMemo(()=>({
-    ...data, dispatch, loading, saveStatus, setSaveStatus,
+    ...data, dispatch, loading, saveStatus, saveMessage, setSaveStatus, setSaveMessage,
     // Convenience setters
     setCos: p => dispatch({type:"SET_COS",payload:p}),
     setCts: p => dispatch({type:"SET_CTS",payload:p}),
@@ -601,7 +602,7 @@ function CRMProvider({ children }) {
     setUsers: p => dispatch({type:"SET_USERS",payload:p}),
     setCurrency: v => dispatch({type:"SET_CURRENCY",payload:v}),
     setStages: v => dispatch({type:"SET_STAGES",payload:v}),
-  }),[data, loading, saveStatus]);
+  }),[data, loading, saveStatus, saveMessage]);
 
   return <CRMContext.Provider value={ctx}>{children}</CRMContext.Provider>;
 }
@@ -675,7 +676,7 @@ function LoadingScreen({lang}){
 }
 
 // ─── Save Status Indicator ────────────────────────────────────────────────────
-function SaveIndicator({status}){
+function SaveIndicator({status, label}){
   if(status==="idle") return null;
   const styles = {
     saving: { color:"#64748b", text:"..." },
@@ -684,8 +685,9 @@ function SaveIndicator({status}){
   };
   const s = styles[status] || styles.saving;
   return(
-    <span style={{fontSize:10,color:s.color,fontFamily:"'JetBrains Mono',monospace",display:"inline-flex",alignItems:"center",gap:3,padding:"2px 8px",background:s.color+"15",borderRadius:5,transition:"all .2s"}}>
-      {s.text}
+    <span title={label || ''} style={{fontSize:10,color:s.color,fontFamily:"'JetBrains Mono',monospace",display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",background:s.color+"15",borderRadius:5,transition:"all .2s"}}>
+      <span>{s.text}</span>
+      {label && <span style={{fontSize:10}}>{label}</span>}
     </span>
   );
 }
@@ -1920,7 +1922,7 @@ function ProspectingActivityForm({ init={}, onSave, onClose, contacts=[], users=
 
 // ─── App Inner (consumes CRM context) ─────────────────────────────────────────
 function AppInner(){
-  const { cos, cts, dls, users, currency, stages, loading, saveStatus, setSaveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages } = useCRM();
+  const { cos, cts, dls, users, currency, stages, loading, saveStatus, saveMessage, setSaveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages } = useCRM();
   const[lang,setLang]=useState("es");
   const t=T[lang];
   const[tab,setTab]=useState("deals");
@@ -1943,11 +1945,13 @@ function AppInner(){
     try {
       await fn();
       setSaveStatus("saved");
-      setTimeout(()=>setSaveStatus("idle"),1000);
+      setSaveMessage('Guardado');
+      setTimeout(()=>{ setSaveStatus("idle"); setSaveMessage(""); },1000);
       return true;
     } catch (e) {
       console.error('save op error:', e);
       setSaveStatus("error");
+      setSaveMessage((e && e.message) ? e.message : 'Error al guardar');
       return false;
     }
   };
@@ -2269,7 +2273,7 @@ function AppInner(){
             <div style={{display:"flex",alignItems:"center",gap:9}}>
               <img src="/intelsius-logo.jpg" alt="Intelsius" style={{height:30,width:"auto",borderRadius:4,objectFit:"contain",background:"#fff"}} />
               <span style={{fontSize:19,fontFamily:"'Inter',Arial,sans-serif",color:"#0f172a"}}>{t.appName}</span>
-              <SaveIndicator status={saveStatus}/>
+              <SaveIndicator status={saveStatus} label={saveStatus==="error" ? (saveMessage || t.saveError) : (saveStatus==="saving" ? t.saving : (saveStatus==="saved" ? 'Guardado' : ''))}/>
             </div>
             <div style={{fontSize:10,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",marginTop:2,paddingLeft:39}}>
               {cos.length} {t.companies.toLowerCase()} · {cts.length} {t.contactsW} · {dls.length} deals
