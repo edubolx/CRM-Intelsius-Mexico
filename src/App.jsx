@@ -1117,26 +1117,26 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
 }
 
 function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateActivityStatus,onUpdateActivity}){
-  const emptyForm = { type:"task", title:"", dueDate:today(), responsible:"", status:"pending", comment:"" };
-  const [form, setForm] = useState(emptyForm);
+  const makeEmptyForm = () => ({ type:"task", title:"", dueDate:today(), responsible:"", status:"pending", comment:"" });
+  const [form, setForm] = useState(makeEmptyForm);
   const [editingId, setEditingId] = useState(null);
   const setF = (k,v) => setForm(p=>({...p,[k]:v}));
 
   const typeOpts = ACTIVITY_TYPES.map(v=>({v,l:t[v]}));
   const statusOpts = ACTIVITY_STATUSES.map(v=>({v,l:t[v]}));
 
-  const resetForm = () => { setForm(emptyForm); setEditingId(null); };
+  const resetForm = () => { setForm(makeEmptyForm()); setEditingId(null); };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if(!form.title?.trim()) return;
     if(editingId){
-      onUpdateActivity(editingId, {...form, title: form.title.trim()});
+      await onUpdateActivity(editingId, {...form, title: form.title.trim()});
       resetForm();
       return;
     }
     const nowIso = new Date().toISOString();
-    onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: nowIso, updatedAt: nowIso, completedAt: form.status === "done" ? nowIso : null });
-    setForm(p=>({...p,title:"",comment:"",status:"pending"}));
+    await onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: nowIso, updatedAt: nowIso, completedAt: form.status === "done" ? nowIso : null });
+    resetForm();
   };
 
   const startEdit = (a) => {
