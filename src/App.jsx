@@ -1461,7 +1461,6 @@ function AppInner(){
             <div style={{display:"flex",alignItems:"center",gap:9}}>
               <img src="/intelsius-logo.jpg" alt="Intelsius" style={{height:30,width:"auto",borderRadius:4,objectFit:"contain",background:"#fff"}} />
               <span style={{fontSize:19,fontFamily:"'Inter',Arial,sans-serif",color:"#0f172a"}}>{t.appName}</span>
-              <SaveIndicator status={saveStatus} label={saveStatus==="error" ? (saveMessage || t.saveError) : (saveStatus==="saving" ? t.saving : (saveStatus==="saved" ? 'Guardado' : ''))}/>
             </div>
             <div style={{fontSize:10,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",marginTop:2,paddingLeft:39}}>
               {cos.length} {t.companies.toLowerCase()} · {cts.length} {t.contactsW} · {dls.length} deals
