@@ -561,6 +561,13 @@ function CRMProvider({ children }) {
   const canAutoSave = useRef(true);
   const saveQueue = useRef(Promise.resolve());
 
+  const reloadFromSupabase = useCallback(async()=>{
+    const loaded = await storageGet(SAMPLE_DATA);
+    canAutoSave.current = loaded.__source === "supabase";
+    dispatch({ type:"LOAD", payload:{ cos:loaded.co, cts:loaded.ct, dls:loaded.dl, users:loaded.users||[], currency:loaded.currency||"USD", stages:loaded.stages||DEFAULT_STAGES }});
+    return loaded;
+  },[]);
+
   // Load
   useEffect(()=>{
     let cancelled = false;
@@ -593,8 +600,29 @@ function CRMProvider({ children }) {
     }).catch(()=>setSaveStatus("error"));
   },[data]);
 
+  useEffect(()=>{
+    if(!supabase) return;
+
+    const tables = ['deals', 'deal_activities', 'meddic_evals', 'companies', 'contacts', 'pipeline_stages', 'crm_users'];
+    const channels = tables.map((table)=>
+      supabase
+        .channel(`crm-realtime-${table}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table }, async()=>{
+          if (!initialLoadDone.current) return;
+          await reloadFromSupabase();
+        })
+        .subscribe()
+    );
+
+    return ()=>{
+      channels.forEach((channel)=>{
+        supabase.removeChannel(channel);
+      });
+    };
+  },[reloadFromSupabase]);
+
   const ctx = useMemo(()=>({
-    ...data, dispatch, loading, saveStatus, saveMessage, setSaveStatus, setSaveMessage,
+    ...data, dispatch, loading, saveStatus, saveMessage, setSaveStatus, setSaveMessage, reloadFromSupabase,
     // Convenience setters
     setCos: p => dispatch({type:"SET_COS",payload:p}),
     setCts: p => dispatch({type:"SET_CTS",payload:p}),
@@ -602,7 +630,7 @@ function CRMProvider({ children }) {
     setUsers: p => dispatch({type:"SET_USERS",payload:p}),
     setCurrency: v => dispatch({type:"SET_CURRENCY",payload:v}),
     setStages: v => dispatch({type:"SET_STAGES",payload:v}),
-  }),[data, loading, saveStatus, saveMessage]);
+  }),[data, loading, saveStatus, saveMessage, reloadFromSupabase]);
 
   return <CRMContext.Provider value={ctx}>{children}</CRMContext.Provider>;
 }
@@ -1922,7 +1950,7 @@ function ProspectingActivityForm({ init={}, onSave, onClose, contacts=[], users=
 
 // ─── App Inner (consumes CRM context) ─────────────────────────────────────────
 function AppInner(){
-  const { cos, cts, dls, users, currency, stages, loading, saveStatus, saveMessage, setSaveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages } = useCRM();
+  const { cos, cts, dls, users, currency, stages, loading, saveStatus, saveMessage, setSaveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages, reloadFromSupabase } = useCRM();
   const[lang,setLang]=useState("es");
   const t=T[lang];
   const[tab,setTab]=useState("deals");
@@ -1944,6 +1972,7 @@ function AppInner(){
     setSaveStatus("saving");
     try {
       await fn();
+      await reloadFromSupabase();
       setSaveStatus("saved");
       setSaveMessage('Guardado');
       setTimeout(()=>{ setSaveStatus("idle"); setSaveMessage(""); },1000);
