@@ -67,7 +67,7 @@ const T = {
     companyName:"Nombre de empresa", industry:"Industria", website:"Sitio web",
     phone:"Teléfono", notes:"Notas", name:"Nombre", email:"Email",
     titleF:"Cargo / Título", linkedin:"LinkedIn", company:"Empresa",
-    dealName:"Nombre del Deal", value:"Valor", stage:"Stage",
+    dealName:"Nombre del Deal", value:"Valor", stage:"Stage", projectionMode:"Tipo de ingreso", projectionOneTime:"Pago único", projection3Months:"Recurrente 3 meses", projection6Months:"Recurrente 6 meses", projection12Months:"Recurrente 12 meses",
     contact:"Contacto", closingDate:"Fecha de cierre", selectOpt:"— Selecciona —",
     leadSource:"Cómo llegó", leadSourceCustom:"Origen custom",
     newUser:"Usuario", newUserTitle:"Nuevo usuario", editUser:"Editar usuario", noUsers:"No hay usuarios aún.",
@@ -153,7 +153,7 @@ const T = {
     companyName:"Company name", industry:"Industry", website:"Website",
     phone:"Phone", notes:"Notes", name:"Name", email:"Email",
     titleF:"Title / Role", linkedin:"LinkedIn", company:"Company",
-    dealName:"Deal name", value:"Value", stage:"Stage",
+    dealName:"Deal name", value:"Value", stage:"Stage", projectionMode:"Revenue type", projectionOneTime:"One-time", projection3Months:"Recurring 3 months", projection6Months:"Recurring 6 months", projection12Months:"Recurring 12 months",
     contact:"Contact", closingDate:"Closing date", selectOpt:"— Select —",
     leadSource:"Lead source", leadSourceCustom:"Custom source",
     newUser:"User", newUserTitle:"New user", editUser:"Edit user", noUsers:"No users yet.",
@@ -1037,7 +1037,7 @@ function CoForm({init={},t,onSave,onClose}){const[f,setF]=useState({name:"",indu
 function CtForm({init={},cos,t,onSave,onClose}){const[f,setF]=useState({name:"",email:"",phone:"",titleF:"",linkedin:"",companyId:"",notes:"",...init});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));const coOpts=[{v:"",l:t.selectOpt},...cos.map(c=>({v:c.id,l:c.name}))];return<><Inp label={t.name+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.name}/><Inp label={t.email} value={f.email} onChange={s("email")} placeholder={t.ph.email}/><Inp label={t.phone} value={f.phone} onChange={s("phone")} placeholder={t.ph.phone}/><Inp label={t.titleF} value={f.titleF} onChange={s("titleF")} placeholder={t.ph.titleF}/><Inp label={t.linkedin} value={f.linkedin} onChange={s("linkedin")} placeholder={t.ph.linkedin}/><Sel label={t.company} value={f.companyId} onChange={s("companyId")} opts={coOpts}/><Txta label={t.notes} value={f.notes} onChange={s("notes")}/><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="ghost" ch={t.cancel} onClick={onClose}/><Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/></div></>;}
 function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
   const defaultStage=stages[0]?.name||"";
-  const [f,setF]=useState({name:"",value:0,stage:defaultStage,companyId:"",contactId:"",leadSource:"",leadSourceCustom:"",closingDate:"",notes:"",...init});
+  const [f,setF]=useState({name:"",value:0,stage:defaultStage,companyId:"",contactId:"",leadSource:"",leadSourceCustom:"",closingDate:"",notes:"",projectionMode:"one_time",...init});
   const [submitState,setSubmitState]=useState("idle");
   const [submitMessage,setSubmitMessage]=useState("");
   const s=k=>e=>setF(p=>{
@@ -1053,13 +1053,24 @@ function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
   const ctOpts=[{v:"",l:t.selectOpt},...filteredContacts.map(c=>({v:c.id,l:c.name}))];
   const stOpts=stages.map(st=>({v:st.name,l:st.name}));
   const sourceOpts=[{v:"",l:t.selectOpt},...LEAD_SOURCES.map(x=>({v:x,l:x}))];
+  const projectionOpts=[
+    {v:"one_time",l:t.projectionOneTime},
+    {v:"custom_months",l:t.projection3Months, months:3},
+    {v:"custom_months_6",l:t.projection6Months, months:6},
+    {v:"twelve_months",l:t.projection12Months}
+  ];
 
   const handleSave = async () => {
     if(!f.name || submitState === "saving") return;
     setSubmitState("saving");
     setSubmitMessage("Guardando...");
     try {
-      const result = await onSave(f);
+      const normalizedProjection = f.projectionMode === "custom_months_6"
+        ? { ...f, projectionMode: "custom_months", projectionCustomMonths: 6 }
+        : f.projectionMode === "custom_months"
+        ? { ...f, projectionCustomMonths: 3 }
+        : { ...f, projectionCustomMonths: f.projectionMode === "twelve_months" ? null : null };
+      const result = await onSave(normalizedProjection);
       if(result === false || result?.ok === false){
         setSubmitState("error");
         setSubmitMessage(result?.message || "No se pudo guardar el deal");
@@ -1089,6 +1100,7 @@ function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
       <Inp label={t.leadSourceCustom} value={f.leadSourceCustom||""} onChange={s("leadSourceCustom")} placeholder="Ej. Evento/Expo"/>
     )}
     <Inp label={t.closingDate} type="date" value={f.closingDate} onChange={s("closingDate")}/>
+    <Sel label={t.projectionMode} value={f.projectionMode||"one_time"} onChange={s("projectionMode")} opts={projectionOpts.map(o=>({v:o.v,l:o.l}))}/>
     <Txta label={t.notes} value={f.notes} onChange={s("notes")}/>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginTop:6}}>
       <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:submitState==="error"?"#ef4444":submitState==="saved"?"#22c55e":"#64748b",minHeight:16}}>
@@ -1196,6 +1208,15 @@ function AppInner(){
     const ok = await withSaveStatus(async()=>{
       const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
       ensureSbOk(res, 'save deal');
+
+      const projectionMode = row.projectionMode || 'one_time';
+      const projectionPayload = {
+        deal_id: row.id,
+        mode: projectionMode === 'custom_months_6' ? 'custom_months' : projectionMode,
+        custom_months: projectionMode === 'custom_months_6' ? 6 : projectionMode === 'custom_months' ? (Number(row.projectionCustomMonths) || 3) : null,
+      };
+      const projectionRes = await supabase.from('deal_projections').upsert([projectionPayload], { onConflict:'deal_id' });
+      ensureSbOk(projectionRes, 'save deal projection');
     });
     if(!ok) return { ok:false, message: 'No se pudo guardar el deal' };
     if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
@@ -1649,7 +1670,7 @@ function AppInner(){
       {modal?.type==="company"&&<Modal title={modal.data.id?t.editCompany:t.newCompanyTitle} onClose={()=>setModal(null)}><CoForm init={modal.data} t={t} onSave={saveCo} onClose={()=>setModal(null)}/></Modal>}
       {modal?.type==="contact"&&<Modal title={modal.data.id?t.editContact:t.newContactTitle} onClose={()=>setModal(null)}><CtForm init={modal.data} cos={cos} t={t} onSave={saveCt} onClose={()=>setModal(null)}/></Modal>}
       {modal?.type==="user"&&<Modal title={modal.data.id?t.editUser:t.newUserTitle} onClose={()=>setModal(null)}><UsrForm init={modal.data} t={t} onSave={saveUsr} onClose={()=>setModal(null)}/></Modal>}
-      {modal?.type==="deal"&&<Modal title={modal.data.id?t.editDeal:t.newDealTitle} onClose={()=>setModal(null)}><DlForm init={modal.data} cos={cos} cts={cts} t={t} lang={lang} currency={currency} stages={stages} onSave={saveDl} onClose={()=>setModal(null)}/></Modal>}
+      {modal?.type==="deal"&&<Modal title={modal.data.id?t.editDeal:t.newDealTitle} onClose={()=>setModal(null)}><DlForm init={{...modal.data, projectionMode: modal.data.projectionMode || 'one_time'}} cos={cos} cts={cts} t={t} lang={lang} currency={currency} stages={stages} onSave={saveDl} onClose={()=>setModal(null)}/></Modal>}
 
       {/* Confirm Delete Dialog */}
       <ConfirmDeleteModal config={confirmDel} t={t} onClose={()=>setConfirmDel(null)}/>

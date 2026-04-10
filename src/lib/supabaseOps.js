@@ -8,6 +8,7 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
       { data: evals },
       { data: stagesRaw },
       { data: usersRaw },
+      { data: projectionsRaw },
     ] = await Promise.all([
       supabase.from('companies').select('*').order('created_at'),
       supabase.from('contacts').select('*').order('created_at'),
@@ -15,6 +16,7 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
       supabase.from('meddic_evals').select('*').order('date'),
       supabase.from('pipeline_stages').select('*').order('position'),
       supabase.from('crm_users').select('*').order('created_at'),
+      supabase.from('deal_projections').select('*'),
     ]);
 
     let activities = [];
@@ -23,26 +25,36 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
       activities = data || [];
     } catch {}
 
-    const dls = (dlsRaw || []).map((d) => ({
-      ...d,
-      value: Number(d.value),
-      meddicHistory: (evals || [])
-        .filter((e) => e.deal_id === d.id)
-        .map((e) => ({ id: e.id, date: e.date, meddic: e.meddic })),
-      activities: (activities || [])
-        .filter((a) => a.deal_id === d.id)
-        .map((a) => ({
-          id: a.id,
-          type: a.type,
-          title: a.title,
-          dueDate: a.due_date,
-          responsible: a.responsible,
-          status: a.status,
-          comment: a.comment || "",
-          createdAt: a.created_at,
-          updatedAt: a.updated_at,
-        })),
-    }));
+    const projectionByDealId = new Map((projectionsRaw || []).map((p) => [p.deal_id, p]));
+
+    const dls = (dlsRaw || []).map((d) => {
+      const projection = projectionByDealId.get(d.id);
+      const projectionMode = projection?.mode === 'custom_months'
+        ? (Number(projection?.custom_months) === 6 ? 'custom_months_6' : 'custom_months')
+        : (projection?.mode || 'one_time');
+      return {
+        ...d,
+        value: Number(d.value),
+        projectionMode,
+        projectionCustomMonths: projection?.custom_months || null,
+        meddicHistory: (evals || [])
+          .filter((e) => e.deal_id === d.id)
+          .map((e) => ({ id: e.id, date: e.date, meddic: e.meddic })),
+        activities: (activities || [])
+          .filter((a) => a.deal_id === d.id)
+          .map((a) => ({
+            id: a.id,
+            type: a.type,
+            title: a.title,
+            dueDate: a.due_date,
+            responsible: a.responsible,
+            status: a.status,
+            comment: a.comment || "",
+            createdAt: a.created_at,
+            updatedAt: a.updated_at,
+          })),
+      };
+    });
 
     const stages = stagesRaw && stagesRaw.length > 0
       ? stagesRaw.map((s) => ({
