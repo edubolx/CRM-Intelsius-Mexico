@@ -1066,7 +1066,11 @@ function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
       }
       setSubmitState("saved");
       setSubmitMessage("Deal guardado ✓");
-      setTimeout(()=>{ setSubmitState("idle"); setSubmitMessage(""); }, 1500);
+      setTimeout(()=>{
+        setSubmitState("idle");
+        setSubmitMessage("");
+        onClose();
+      }, 900);
     } catch {
       setSubmitState("error");
       setSubmitMessage("No se pudo guardar el deal");
@@ -1187,7 +1191,6 @@ function AppInner(){
     });
     if(!ok) return false;
     setDls(p=>f.id?p.map(d=>d.id===row.id?row:d):[...p,row]);
-    setModal(null);
     if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
     return true;
   };
