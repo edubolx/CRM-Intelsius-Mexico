@@ -2397,7 +2397,7 @@ function AppInner(){
       {/* Deal Detail / MEDDIC modal */}
       {viewDeal&&(
         <DealDetailModal
-          deal={viewDeal}
+          deal={(dls.find(x=>x.id===viewDeal.id) || viewDeal)}
           cos={cos} cts={cts} users={users} lang={lang} currency={currency} stages={stages} t={t}
           onSaveEval={ev=>saveEval(viewDeal.id,ev)}
           onDeleteEval={evalId=>deleteEval(viewDeal.id,evalId)}
@@ -2405,7 +2405,7 @@ function AppInner(){
           onDeleteActivity={activityId=>deleteActivity(viewDeal.id,activityId)}
           onUpdateActivityStatus={(activityId,status)=>updateActivityStatus(viewDeal.id,activityId,status)}
           onUpdateActivity={(activityId,patch)=>updateActivity(viewDeal.id,activityId,patch)}
-          onEditDeal={()=>{setModal({type:"deal",data:viewDeal});setViewDeal(null);}}
+          onEditDeal={()=>{setModal({type:"deal",data:(dls.find(x=>x.id===viewDeal.id) || viewDeal)});setViewDeal(null);}}
           onClose={()=>setViewDeal(null)}/>
       )}
 
