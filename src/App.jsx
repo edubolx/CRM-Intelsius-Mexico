@@ -1121,6 +1121,7 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
   const [form, setForm] = useState(makeEmptyForm);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [localError, setLocalError] = useState("");
   const setF = (k,v) => setForm(p=>({...p,[k]:v}));
 
   const typeOpts = ACTIVITY_TYPES.map(v=>({v,l:t[v]}));
@@ -1130,15 +1131,18 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
 
   const handleSave = async () => {
     if(!form.title?.trim() || saving) return;
+    setLocalError("");
     setSaving(true);
     try {
       if(editingId){
-        await onUpdateActivity(editingId, {...form, title: form.title.trim()});
+        const ok = await onUpdateActivity(editingId, {...form, title: form.title.trim()});
+        if(!ok){ setLocalError('No se pudo guardar la actividad.'); return; }
         resetForm();
         return;
       }
       const nowIso = new Date().toISOString();
-      await onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: nowIso, updatedAt: nowIso, completedAt: form.status === "done" ? nowIso : null });
+      const ok = await onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: nowIso, updatedAt: nowIso, completedAt: form.status === "done" ? nowIso : null });
+      if(!ok){ setLocalError('No se pudo guardar la actividad.'); return; }
       resetForm();
     } finally {
       setSaving(false);
@@ -1169,8 +1173,9 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
       <Txta label={t.activityComment} value={form.comment} onChange={e=>setF("comment",e.target.value)} />
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:8}}>
         {editingId && <Btn v="ghost" ch={t.cancel} onClick={resetForm}/>}        
-        <Btn ch={<><Ic n={editingId?"check":"plus"} s={12}/>{saving ? (t.saving || 'Guardando...') : (editingId?t.activityUpdate:t.addActivity)}</>} onClick={handleSave} sx={{opacity:saving?0.65:1,pointerEvents:saving?'none':'auto'}}/>
+        <Btn ch={<><Ic n={editingId?"check":"plus"} s={12}/>{saving ? (t.saving || 'Guardando...') : (editingId?t.activityUpdate:t.addActivity)}</>} onClick={handleSave} disabled={saving} sx={{opacity:saving?0.65:1,pointerEvents:saving?'none':'auto'}}/>
       </div>
+      {localError && <div style={{marginTop:8,fontSize:11,color:'#ef4444',fontFamily:"'JetBrains Mono',monospace"}}>{localError}</div>}
 
       <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
         {(!(deal.activities||[]).length) && (
@@ -2151,24 +2156,23 @@ function AppInner(){
       completedAt: activity.status === "done" ? (activity.completedAt || new Date().toISOString()) : (activity.completedAt || null),
     };
     const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deal_activities').upsert([{
+      const payload = {
         id: row.id,
         deal_id: dealId,
         type: row.type,
         title: row.title,
         due_date: row.dueDate || null,
-        responsible: row.responsible || "",
+        responsible: row.responsible || null,
         status: row.status || "pending",
-        comment: row.comment || "",
-        created_at: row.createdAt,
-        updated_at: row.updatedAt,
-        completed_at: row.completedAt || null,
-      }], { onConflict:'id' });
+        comment: row.comment || null,
+      };
+      const res = await supabase.from('deal_activities').insert([payload]);
       ensureSbOk(res, 'add deal activity');
     });
-    if(!ok) return;
+    if(!ok) return false;
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]),row]}:d));
     setViewDeal(p=>p&&p.id===dealId?{...p,activities:[...(p.activities||[]),row]}:p);
+    return true;
   };
   const deleteActivity=async(dealId, activityId)=>{
     const ok = await withSaveStatus(async()=>{
@@ -2184,10 +2188,10 @@ function AppInner(){
     const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
     const completedAt = status === "done" ? ((current && current.completedAt) || nowIso) : null;
     const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deal_activities').update({ status, completed_at: completedAt, updated_at: nowIso }).eq('id', activityId);
+      const res = await supabase.from('deal_activities').update({ status }).eq('id', activityId);
       ensureSbOk(res, 'update deal activity status');
     });
-    if(!ok) return;
+    if(!ok) return false;
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>{
       if(a.id!==activityId) return a;
       return { ...a, status, completedAt, updatedAt: nowIso };
@@ -2196,11 +2200,12 @@ function AppInner(){
       if(a.id!==activityId) return a;
       return { ...a, status, completedAt, updatedAt: nowIso };
     })}:p);
+    return true;
   };
 
   const updateActivity=async(dealId, activityId, patch)=>{
     const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
-    if(!current) return;
+    if(!current) return false;
     const nowIso = new Date().toISOString();
     const next = { ...current, ...patch, updatedAt: nowIso };
     const ok = await withSaveStatus(async()=>{
@@ -2208,17 +2213,16 @@ function AppInner(){
         type: next.type,
         title: next.title,
         due_date: next.dueDate || null,
-        responsible: next.responsible || "",
+        responsible: next.responsible || null,
         status: next.status || "pending",
-        comment: next.comment || "",
-        updated_at: next.updatedAt,
-        completed_at: next.completedAt || null,
+        comment: next.comment || null,
       }).eq('id', activityId);
       ensureSbOk(res, 'update deal activity');
     });
-    if(!ok) return;
+    if(!ok) return false;
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?next:a)}:d));
     setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?next:a)}:p);
+    return true;
   };
 
   const openDealActivities=(dealId)=>{
