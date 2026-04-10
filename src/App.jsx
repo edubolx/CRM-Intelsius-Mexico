@@ -2175,7 +2175,11 @@ function AppInner(){
     });
     if(!ok) return false;
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]),row]}:d));
-    setViewDeal(p=>p&&p.id===dealId?{...p,activities:[...(p.activities||[]),row]}:p);
+    setViewDeal(p=>{
+      if(!p || p.id!==dealId) return p;
+      const currentActivities = Array.isArray(p.activities) ? p.activities : [];
+      return {...p,activities:[...currentActivities,row]};
+    });
     return true;
   };
   const deleteActivity=async(dealId, activityId)=>{
@@ -2185,7 +2189,11 @@ function AppInner(){
     });
     if(!ok) return;
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).filter(a=>a.id!==activityId)}:d));
-    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).filter(a=>a.id!==activityId)}:p);
+    setViewDeal(p=>{
+      if(!p || p.id!==dealId) return p;
+      const currentActivities = Array.isArray(p.activities) ? p.activities : [];
+      return {...p,activities:currentActivities.filter(a=>a.id!==activityId)};
+    });
   };
   const updateActivityStatus=async(dealId, activityId, status)=>{
     const nowIso = new Date().toISOString();
@@ -2200,10 +2208,14 @@ function AppInner(){
       if(a.id!==activityId) return a;
       return { ...a, status, completedAt, updatedAt: nowIso };
     })}:d));
-    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>{
-      if(a.id!==activityId) return a;
-      return { ...a, status, completedAt, updatedAt: nowIso };
-    })}:p);
+    setViewDeal(p=>{
+      if(!p || p.id!==dealId) return p;
+      const currentActivities = Array.isArray(p.activities) ? p.activities : [];
+      return {...p,activities:currentActivities.map(a=>{
+        if(a.id!==activityId) return a;
+        return { ...a, status, completedAt, updatedAt: nowIso };
+      })};
+    });
     return true;
   };
 
@@ -2225,7 +2237,11 @@ function AppInner(){
     });
     if(!ok) return false;
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?next:a)}:d));
-    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?next:a)}:p);
+    setViewDeal(p=>{
+      if(!p || p.id!==dealId) return p;
+      const currentActivities = Array.isArray(p.activities) ? p.activities : [];
+      return {...p,activities:currentActivities.map(a=>a.id===activityId?next:a)};
+    });
     return true;
   };
 
