@@ -1156,7 +1156,6 @@ function AppInner(){
       ensureSbOk(res, 'save company');
     });
     if(!ok) return;
-    setCos(p=>f.id?p.map(c=>c.id===row.id?row:c):[...p,row]);
     setModal(null);
   };
 
@@ -1167,7 +1166,6 @@ function AppInner(){
       ensureSbOk(res, 'save contact');
     });
     if(!ok) return;
-    setCts(p=>f.id?p.map(c=>c.id===row.id?row:c):[...p,row]);
     setModal(null);
   };
 
@@ -1178,7 +1176,6 @@ function AppInner(){
       ensureSbOk(res, 'save user');
     });
     if(!ok) return;
-    setUsers(p=>f.id?p.map(u=>u.id===row.id?row:u):[...p,row]);
     setModal(null);
   };
 
