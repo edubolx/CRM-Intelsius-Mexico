@@ -7,6 +7,9 @@ import ActivitiesDashboard from './components/activities/ActivitiesDashboard.jsx
 import DealDetailModal from './components/deals/DealDetailModal.jsx'
 import Kanban from './components/deals/Kanban.jsx'
 import ProspectingBoard from './components/prospecting/ProspectingBoard.jsx'
+import ProspectingCompanyForm from './components/prospecting/ProspectingCompanyForm.jsx'
+import ProspectingContactForm from './components/prospecting/ProspectingContactForm.jsx'
+import ProspectingActivityForm from './components/prospecting/ProspectingActivityForm.jsx'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -1074,69 +1077,6 @@ function ImportModal({type,t,cos,onImportCo,onImportCt,onClose}){const[state,set
 function BulkBar({type,t,data,cos,onImportCo,onImportCt}){const[open,setOpen]=useState(false);const[importOpen,setImportOpen]=useState(false);const isCo=type==="company";const handleExport=()=>{const cols=isCo?CO_COLS:CT_COLS;const rows=isCo?data:data.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);return{...ct,companyName:co?.name||""};});const filename=isCo?`empresas_${new Date().toISOString().slice(0,10)}.csv`:`contactos_${new Date().toISOString().slice(0,10)}.csv`;downloadBlob(toCSV(rows,cols),filename);};return(<><div style={{position:"relative",display:"inline-block"}}><Btn ch={<><Ic n="layers" s={12}/>{t.importExport}<Ic n="chevDown" s={11}/></>} v="subtle" onClick={()=>setOpen(p=>!p)}/>{open&&(<div style={{position:"absolute",right:0,top:"calc(100% + 6px)",background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:10,minWidth:200,boxShadow:"0 8px 32px rgba(0,62,126,.1)",zIndex:100,overflow:"hidden"}}><button onClick={()=>{setOpen(false);setImportOpen(true);}} style={{width:"100%",background:"none",border:"none",color:"#0f172a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #cbd5e1"}}><Ic n="upload" s={13}/>{t.importCSV}</button><button onClick={()=>{setOpen(false);handleExport();}} style={{width:"100%",background:"none",border:"none",color:"#0f172a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #cbd5e1"}}><Ic n="download" s={13}/>{t.exportCSV}</button><button onClick={()=>{setOpen(false);const cols=isCo?CO_COLS:CT_COLS;const tpl=isCo?[{name:"Ejemplo SA",industry:"Retail",website:"ejemplo.com",phone:"+52 55 0000 0000",notes:""}]:[{name:"Juan Pérez",email:"juan@co.com",phone:"+52 55 0000 0000",titleF:"Gerente",linkedin:"",companyName:"Ejemplo SA",notes:""}];downloadBlob(toCSV(tpl,cols),isCo?"plantilla_empresas.csv":"plantilla_contactos.csv");}} style={{width:"100%",background:"none",border:"none",color:"#334155",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit"}}><Ic n="template" s={13}/>{t.downloadTemplate}</button></div>)}</div>{importOpen&&<ImportModal type={type} t={t} cos={cos} onImportCo={onImportCo} onImportCt={onImportCt} onClose={()=>setImportOpen(false)}/>}{open&&<div style={{position:"fixed",inset:0,zIndex:99}} onClick={()=>setOpen(false)}/>}</>);}
 
 // ─── Kanban ───────────────────────────────────────────────────────────────────
-function ProspectingCompanyForm({ init={}, onSave, onClose, lang, users=[] }){
-  const [f, setF] = useState({ name:'', status:'nueva', owner_id:'', industry:'', country:'', company_size:'', lead_source:'', priority:'', notes:'', ...init });
-  const s = k => e => setF(p=>({ ...p, [k]: e.target.value }));
-  return (
-    <>
-      <Inp label="Nombre de empresa *" value={f.name} onChange={s('name')} />
-      <Sel label="Estado" value={f.status} onChange={s('status')} opts={PROSPECTING_STATUSES.map(st=>({ v:st.value, l:st.label[lang] }))} />
-      <Sel label="Owner" value={f.owner_id || ''} onChange={s('owner_id')} opts={[{v:'',l:'— Selecciona —'}, ...users.map(u=>({ v:u.alias || u.name, l:u.alias || u.name }))]} />
-      <Inp label="Industria" value={f.industry || ''} onChange={s('industry')} />
-      <Inp label="País" value={f.country || ''} onChange={s('country')} />
-      <Inp label="Tamaño" value={f.company_size || ''} onChange={s('company_size')} />
-      <Inp label="Origen lead" value={f.lead_source || ''} onChange={s('lead_source')} />
-      <Inp label="Prioridad" value={f.priority || ''} onChange={s('priority')} />
-      <Txta label="Notas" value={f.notes || ''} onChange={s('notes')} />
-      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
-        <Btn v="ghost" ch="Cancelar" onClick={onClose} />
-        <Btn ch="Guardar" onClick={()=>onSave(f)} disabled={!f.name?.trim()} />
-      </div>
-    </>
-  );
-}
-
-function ProspectingContactForm({ init={}, onSave, onClose }){
-  const [f, setF] = useState({ company_id:'', name:'', title:'', email:'', phone:'', linkedin_url:'', notes:'', ...init });
-  const s = k => e => setF(p=>({ ...p, [k]: e.target.value }));
-  return (
-    <>
-      <Inp label="Nombre *" value={f.name} onChange={s('name')} />
-      <Inp label="Cargo" value={f.title || ''} onChange={s('title')} />
-      <Inp label="Email" value={f.email || ''} onChange={s('email')} />
-      <Inp label="Teléfono" value={f.phone || ''} onChange={s('phone')} />
-      <Inp label="LinkedIn" value={f.linkedin_url || ''} onChange={s('linkedin_url')} />
-      <Txta label="Notas" value={f.notes || ''} onChange={s('notes')} />
-      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
-        <Btn v="ghost" ch="Cancelar" onClick={onClose} />
-        <Btn ch="Guardar" onClick={()=>onSave(f)} disabled={!f.name?.trim()} />
-      </div>
-    </>
-  );
-}
-
-function ProspectingActivityForm({ init={}, onSave, onClose, contacts=[], users=[], lang }){
-  const [f, setF] = useState({ company_id:'', contact_id:'', activity_type:'investigacion', status:'pendiente', activity_at:new Date().toISOString().slice(0,16), outcome:'', next_step:'', next_action_at:'', owner_id:'', notes:'', attachment_url:'', ...init });
-  const s = k => e => setF(p=>({ ...p, [k]: e.target.value }));
-  return (
-    <>
-      <Sel label="Tipo" value={f.activity_type} onChange={s('activity_type')} opts={PROSPECTING_ACTIVITY_TYPES.map(st=>({ v:st.value, l:st.label[lang] }))} />
-      <Sel label="Estado" value={f.status || 'pendiente'} onChange={s('status')} opts={PROSPECTING_ACTIVITY_STATUSES.map(st=>({ v:st.value, l:st.label[lang] }))} />
-      <Sel label="Contacto" value={f.contact_id || ''} onChange={s('contact_id')} opts={[{v:'',l:'Solo empresa'}, ...contacts.map(c=>({ v:c.id, l:c.name }))]} />
-      <Inp label="Fecha/hora" type="datetime-local" value={String(f.activity_at || '').slice(0,16)} onChange={s('activity_at')} />
-      <Inp label="Resultado" value={f.outcome || ''} onChange={s('outcome')} />
-      <Inp label="Siguiente paso" value={f.next_step || ''} onChange={s('next_step')} />
-      <Inp label="Fecha próxima acción" type="date" value={f.next_action_at ? String(f.next_action_at).slice(0,10) : ''} onChange={s('next_action_at')} />
-      <Sel label="Responsable" value={f.owner_id || ''} onChange={s('owner_id')} opts={[{v:'',l:'— Selecciona —'}, ...users.map(u=>({ v:u.alias || u.name, l:u.alias || u.name }))]} />
-      <Inp label="Adjunto/URL" value={f.attachment_url || ''} onChange={s('attachment_url')} />
-      <Txta label="Notas" value={f.notes || ''} onChange={s('notes')} />
-      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
-        <Btn v="ghost" ch="Cancelar" onClick={onClose} />
-        <Btn ch="Guardar" onClick={()=>onSave(f)} />
-      </div>
-    </>
-  );
-}
 
 // ─── App Inner (consumes CRM context) ─────────────────────────────────────────
 function AppInner(){
@@ -1598,7 +1538,11 @@ function AppInner(){
               lang={lang}
               users={users}
               helpers={{ uid, PROSPECTING_STATUSES, PROSPECTING_ACTIVITY_TYPES, PROSPECTING_ACTIVITY_STATUSES, Btn, Ic, Modal, iSx }}
-              forms={{ ProspectingCompanyForm, ProspectingContactForm, ProspectingActivityForm }}
+              forms={{
+                ProspectingCompanyForm: (props) => <ProspectingCompanyForm {...props} helpers={{ Inp, Sel, Txta, Btn, PROSPECTING_STATUSES }} />,
+                ProspectingContactForm: (props) => <ProspectingContactForm {...props} helpers={{ Inp, Txta, Btn }} />,
+                ProspectingActivityForm: (props) => <ProspectingActivityForm {...props} helpers={{ Inp, Sel, Txta, Btn, PROSPECTING_ACTIVITY_TYPES, PROSPECTING_ACTIVITY_STATUSES }} />,
+              }}
             />
           )}
           {tab==="activities"&&(
