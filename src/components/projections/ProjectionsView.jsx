@@ -81,6 +81,34 @@ function Sparkline({ values, color = "#27aae1" }) {
   );
 }
 
+function SectionCard({ title, subtitle, children, right }) {
+  return (
+    <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, boxShadow: "0 6px 18px rgba(15,23,42,.08)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{title}</div>
+          {subtitle ? <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{subtitle}</div> : null}
+        </div>
+        {right || null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function MiniLegend({ items }) {
+  return (
+    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+      {items.map((item) => (
+        <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748b" }}>
+          <span style={{ width: 10, height: 10, borderRadius: 999, background: item.color, display: "inline-block" }} />
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function KpiCard({ title, value, subtitle, color }) {
   return (
     <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, boxShadow: "0 6px 18px rgba(15,23,42,.08)" }}>
@@ -191,6 +219,8 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     es: {
       title: "Proyecciones",
       subtitle: "Restaurado desde backend de Supabase. Esta vista usa monthly_targets_actuals + deal_projections + deals activos.",
+      coverageNote: "Cobertura automática: si un deal no tiene configuración en deal_projections, entra por default como one_time en su mes de cierre.",
+      monthlyDetail: "Vista ejecutiva rolling de 12 meses con cálculo simple y ponderado por etapa.",
       refresh: "Refrescar",
       loading: "Cargando proyecciones...",
       noData: "No hay datos todavía.",
@@ -212,6 +242,8 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     en: {
       title: "Projections",
       subtitle: "Restored from Supabase backend. This view uses monthly_targets_actuals + deal_projections + active deals.",
+      coverageNote: "Automatic coverage: if a deal has no row in deal_projections, it defaults to one_time on its closing month.",
+      monthlyDetail: "Rolling 12-month executive view with simple and stage-weighted calculation.",
       refresh: "Refresh",
       loading: "Loading projections...",
       noData: "No data yet.",
@@ -233,6 +265,8 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
   }[lang] || {
     title: "Projections",
     subtitle: "",
+    coverageNote: "",
+    monthlyDetail: "",
     refresh: "Refresh",
     loading: "Loading...",
     noData: "No data.",
@@ -259,6 +293,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
           <div style={{ fontSize: 24, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>{copy.title}</div>
           <div style={{ fontSize: 12, color: "#64748b", maxWidth: 780 }}>{copy.subtitle}</div>
           <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>{copy.source}: {copy.sourceText}</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 8, maxWidth: 820 }}>{copy.coverageNote}</div>
         </div>
         <button onClick={load} style={{ background: "#eef2f7", color: "#334155", border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{copy.refresh}</button>
       </div>
@@ -276,21 +311,18 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
-            <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginBottom: 10 }}>{copy.cumulative}</div>
+            <SectionCard title={copy.cumulative} subtitle={copy.monthlyDetail}>
               <Sparkline values={model.rows.map((row) => row.cumulativeEstimated)} color="#003e7e" />
-              <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>{copy.estimated} vs {copy.target} vs {copy.actual}</div>
-            </div>
-            <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginBottom: 10 }}>{copy.breakEven}</div>
+              <MiniLegend items={[{ label: copy.estimated, color: "#003e7e" }, { label: copy.target, color: "#5e9732" }, { label: copy.actual, color: "#16a34a" }]} />
+            </SectionCard>
+            <SectionCard title={copy.breakEven} subtitle={`${copy.estimated} - ${copy.expenses}`}>
               <Sparkline values={model.rows.map((row) => row.cumulativeEstimated - row.cumulativeExpenses)} color="#16a34a" />
-              <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>{copy.estimated} - {copy.expenses}</div>
-            </div>
-            <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginBottom: 10 }}>{copy.weightedBreakEven}</div>
+              <MiniLegend items={[{ label: copy.estimated, color: "#003e7e" }, { label: copy.expenses, color: "#ef4444" }]} />
+            </SectionCard>
+            <SectionCard title={copy.weightedBreakEven} subtitle={`${copy.weighted} - ${copy.expenses}`}>
               <Sparkline values={model.rows.map((row) => row.cumulativeWeighted - row.cumulativeExpenses)} color="#7c2b83" />
-              <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>{copy.weighted} - {copy.expenses}</div>
-            </div>
+              <MiniLegend items={[{ label: copy.weighted, color: "#7c2b83" }, { label: copy.expenses, color: "#ef4444" }]} />
+            </SectionCard>
           </div>
 
           <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, overflow: "hidden" }}>
