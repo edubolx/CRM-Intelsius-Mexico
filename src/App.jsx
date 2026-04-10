@@ -1111,7 +1111,7 @@ function BulkBar({type,t,data,cos,onImportCo,onImportCt}){const[open,setOpen]=us
 
 // ─── App Inner (consumes CRM context) ─────────────────────────────────────────
 function AppInner(){
-  const { cos, cts, dls, users, currency, stages, loading, saveStatus, saveMessage, setSaveStatus, setCos, setCts, setDls, setUsers, setCurrency, setStages, reloadFromSupabase } = useCRM();
+  const { cos, cts, dls, users, currency, stages, loading, saveStatus, saveMessage, setSaveStatus, setSaveMessage, setCos, setCts, setDls, setUsers, setCurrency, setStages, reloadFromSupabase } = useCRM();
   const[lang,setLang]=useState("es");
   const t=T[lang];
   const[tab,setTab]=useState("deals");
