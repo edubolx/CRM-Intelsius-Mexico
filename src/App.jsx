@@ -1271,7 +1271,13 @@ function AppInner(){
     setConfirmDel({
       type:"deal",
       name: dl.name,
-      onDelete: ()=>{
+      onDelete: async()=>{
+        const ok = await withSaveStatus(async()=>{
+          ensureSbOk(await supabase.from('deal_activities').delete().eq('deal_id', id), 'delete deal activities');
+          ensureSbOk(await supabase.from('meddic_evals').delete().eq('deal_id', id), 'delete deal meddic evals');
+          ensureSbOk(await supabase.from('deals').delete().eq('id', id), 'delete deal');
+        });
+        if(!ok) return;
         setDls(p=>p.filter(d=>d.id!==id));
         if(viewDeal?.id===id) setViewDeal(null);
       },
