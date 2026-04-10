@@ -36,8 +36,12 @@ export function CRMProvider({ children, sampleData, defaultStages }) {
         stages: loaded.stages || defaultStages,
       },
     });
+    if (saveStatus !== "saving") {
+      setSaveStatus("idle");
+      setSaveMessage("");
+    }
     return loaded;
-  }, [sampleData, defaultStages]);
+  }, [sampleData, defaultStages, saveStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +65,8 @@ export function CRMProvider({ children, sampleData, defaultStages }) {
           },
         });
         setLoading(false);
+        setSaveStatus("idle");
+        setSaveMessage("");
         setTimeout(() => {
           initialLoadDone.current = true;
         }, 50);
