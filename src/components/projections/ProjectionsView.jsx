@@ -109,6 +109,32 @@ function MiniLegend({ items }) {
   );
 }
 
+function ProjectionModeSelect({ value, onChange, disabled, labels }) {
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: "100%",
+        background: "#f8fafc",
+        border: "1px solid #cfd8e3",
+        borderRadius: 10,
+        padding: "8px 10px",
+        color: "#0f172a",
+        fontSize: 12,
+        fontFamily: "inherit",
+        outline: "none"
+      }}
+    >
+      <option value="one_time">{labels.oneTime}</option>
+      <option value="custom_3">{labels.threeMonths}</option>
+      <option value="custom_6">{labels.sixMonths}</option>
+      <option value="twelve_months">{labels.twelveMonths}</option>
+    </select>
+  );
+}
+
 function KpiCard({ title, value, subtitle, color }) {
   return (
     <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, boxShadow: "0 6px 18px rgba(15,23,42,.08)" }}>
@@ -124,6 +150,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
   const [dealProjections, setDealProjections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [savingDealId, setSavingDealId] = useState("");
 
   const load = useCallback(async () => {
     if (!supabase) {
@@ -153,6 +180,55 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
   useEffect(() => {
     load();
   }, [load]);
+
+  const dealRows = useMemo(() => {
+    const projectionMap = new Map((dealProjections || []).map((row) => [row.deal_id, row]));
+    return (deals || [])
+      .filter((deal) => {
+        const stage = String(deal.stage || "").toLowerCase();
+        return !stage.includes("lost") && !stage.includes("perdido") && !stage.includes("hold") && !stage.includes("pausa") && !stage.includes("congel");
+      })
+      .sort((a, b) => String(a.closingDate || a.closing_date || "").localeCompare(String(b.closingDate || b.closing_date || "")))
+      .map((deal) => {
+        const projection = projectionMap.get(deal.id) || null;
+        const uiMode = projection?.mode === "custom_months"
+          ? (Number(projection?.custom_months) === 6 ? "custom_6" : "custom_3")
+          : (projection?.mode || "one_time");
+        return {
+          id: deal.id,
+          name: deal.name,
+          company: deal.company || deal.companyName || "",
+          stage: deal.stage,
+          value: Number(deal.value) || 0,
+          closingDate: deal.closingDate || deal.closing_date || "",
+          uiMode,
+        };
+      });
+  }, [deals, dealProjections]);
+
+  const saveProjectionMode = useCallback(async (dealId, uiMode) => {
+    if (!supabase) return;
+    const payload = uiMode === "custom_6"
+      ? { deal_id: dealId, mode: "custom_months", custom_months: 6 }
+      : uiMode === "custom_3"
+      ? { deal_id: dealId, mode: "custom_months", custom_months: 3 }
+      : uiMode === "twelve_months"
+      ? { deal_id: dealId, mode: "twelve_months", custom_months: null }
+      : { deal_id: dealId, mode: "one_time", custom_months: null };
+
+    setSavingDealId(dealId);
+    setDealProjections((prev) => {
+      const others = (prev || []).filter((row) => row.deal_id !== dealId);
+      return [...others, payload];
+    });
+
+    const { error: upsertError } = await supabase.from("deal_projections").upsert([payload], { onConflict: "deal_id" });
+    setSavingDealId("");
+    if (upsertError) {
+      setError(upsertError.message || (lang === "es" ? "No se pudo guardar la proyección del deal." : "Could not save deal projection."));
+      await load();
+    }
+  }, [lang, load]);
 
   const model = useMemo(() => {
     const months = buildMonths();
@@ -221,6 +297,18 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       subtitle: "Restaurado desde backend de Supabase. Esta vista usa monthly_targets_actuals + deal_projections + deals activos.",
       coverageNote: "Cobertura automática: si un deal no tiene configuración en deal_projections, entra por default como one_time en su mes de cierre.",
       monthlyDetail: "Vista ejecutiva rolling de 12 meses con cálculo simple y ponderado por etapa.",
+      dealConfigTitle: "Configuración por deal",
+      dealConfigSubtitle: "Aquí sí vive el selector por deal. Cambia el período sin tocar el resto del CRM.",
+      dealName: "Deal",
+      dealStage: "Stage",
+      dealValue: "Valor",
+      dealClose: "Cierre",
+      dealMode: "Período",
+      oneTime: "Pago único",
+      threeMonths: "3 meses",
+      sixMonths: "6 meses",
+      twelveMonths: "12 meses",
+      saving: "Guardando...",
       refresh: "Refrescar",
       loading: "Cargando proyecciones...",
       noData: "No hay datos todavía.",
@@ -244,6 +332,18 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       subtitle: "Restored from Supabase backend. This view uses monthly_targets_actuals + deal_projections + active deals.",
       coverageNote: "Automatic coverage: if a deal has no row in deal_projections, it defaults to one_time on its closing month.",
       monthlyDetail: "Rolling 12-month executive view with simple and stage-weighted calculation.",
+      dealConfigTitle: "Per-deal configuration",
+      dealConfigSubtitle: "The selector lives here, inside Projections, without touching the rest of the CRM.",
+      dealName: "Deal",
+      dealStage: "Stage",
+      dealValue: "Value",
+      dealClose: "Close",
+      dealMode: "Period",
+      oneTime: "One-time",
+      threeMonths: "3 months",
+      sixMonths: "6 months",
+      twelveMonths: "12 months",
+      saving: "Saving...",
       refresh: "Refresh",
       loading: "Loading projections...",
       noData: "No data yet.",
@@ -267,6 +367,18 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     subtitle: "",
     coverageNote: "",
     monthlyDetail: "",
+    dealConfigTitle: "Per-deal configuration",
+    dealConfigSubtitle: "",
+    dealName: "Deal",
+    dealStage: "Stage",
+    dealValue: "Value",
+    dealClose: "Close",
+    dealMode: "Period",
+    oneTime: "One-time",
+    threeMonths: "3 months",
+    sixMonths: "6 months",
+    twelveMonths: "12 months",
+    saving: "Saving...",
     refresh: "Refresh",
     loading: "Loading...",
     noData: "No data.",
@@ -309,6 +421,38 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
             <KpiCard title={copy.actual} value={fmtMoney(model.totals.actualSales, currency)} subtitle="Closed / booked" color="#16a34a" />
             <KpiCard title={copy.expenses} value={fmtMoney(model.totals.expectedExpenses, currency)} subtitle="12 months" color="#ef4444" />
           </div>
+
+          <SectionCard title={copy.dealConfigTitle} subtitle={copy.dealConfigSubtitle} right={savingDealId ? <span style={{ fontSize: 11, color: "#64748b" }}>{copy.saving}</span> : null}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc", color: "#334155" }}>
+                    {[copy.dealName, copy.dealStage, copy.dealValue, copy.dealClose, copy.dealMode].map((header) => (
+                      <th key={header} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {dealRows.map((row) => (
+                    <tr key={row.id}>
+                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", color: "#0f172a", fontWeight: 600 }}>{row.name}</td>
+                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{row.stage}</td>
+                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{fmtMoney(row.value, currency)}</td>
+                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{row.closingDate || "—"}</td>
+                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", minWidth: 180 }}>
+                        <ProjectionModeSelect
+                          value={row.uiMode}
+                          disabled={savingDealId === row.id}
+                          onChange={(nextValue) => saveProjectionMode(row.id, nextValue)}
+                          labels={{ oneTime: copy.oneTime, threeMonths: copy.threeMonths, sixMonths: copy.sixMonths, twelveMonths: copy.twelveMonths }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
             <SectionCard title={copy.cumulative} subtitle={copy.monthlyDetail}>
