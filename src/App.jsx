@@ -5,6 +5,7 @@ import { CRMProvider, useCRM } from './state/CRMContext.jsx'
 import ActivitiesPanel from './components/activities/ActivitiesPanel.jsx'
 import ActivitiesDashboard from './components/activities/ActivitiesDashboard.jsx'
 import DealDetailModal from './components/deals/DealDetailModal.jsx'
+import Kanban from './components/deals/Kanban.jsx'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -1072,116 +1073,6 @@ function ImportModal({type,t,cos,onImportCo,onImportCt,onClose}){const[state,set
 function BulkBar({type,t,data,cos,onImportCo,onImportCt}){const[open,setOpen]=useState(false);const[importOpen,setImportOpen]=useState(false);const isCo=type==="company";const handleExport=()=>{const cols=isCo?CO_COLS:CT_COLS;const rows=isCo?data:data.map(ct=>{const co=cos.find(c=>c.id===ct.companyId);return{...ct,companyName:co?.name||""};});const filename=isCo?`empresas_${new Date().toISOString().slice(0,10)}.csv`:`contactos_${new Date().toISOString().slice(0,10)}.csv`;downloadBlob(toCSV(rows,cols),filename);};return(<><div style={{position:"relative",display:"inline-block"}}><Btn ch={<><Ic n="layers" s={12}/>{t.importExport}<Ic n="chevDown" s={11}/></>} v="subtle" onClick={()=>setOpen(p=>!p)}/>{open&&(<div style={{position:"absolute",right:0,top:"calc(100% + 6px)",background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:10,minWidth:200,boxShadow:"0 8px 32px rgba(0,62,126,.1)",zIndex:100,overflow:"hidden"}}><button onClick={()=>{setOpen(false);setImportOpen(true);}} style={{width:"100%",background:"none",border:"none",color:"#0f172a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #cbd5e1"}}><Ic n="upload" s={13}/>{t.importCSV}</button><button onClick={()=>{setOpen(false);handleExport();}} style={{width:"100%",background:"none",border:"none",color:"#0f172a",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit",borderBottom:"1px solid #cbd5e1"}}><Ic n="download" s={13}/>{t.exportCSV}</button><button onClick={()=>{setOpen(false);const cols=isCo?CO_COLS:CT_COLS;const tpl=isCo?[{name:"Ejemplo SA",industry:"Retail",website:"ejemplo.com",phone:"+52 55 0000 0000",notes:""}]:[{name:"Juan Pérez",email:"juan@co.com",phone:"+52 55 0000 0000",titleF:"Gerente",linkedin:"",companyName:"Ejemplo SA",notes:""}];downloadBlob(toCSV(tpl,cols),isCo?"plantilla_empresas.csv":"plantilla_contactos.csv");}} style={{width:"100%",background:"none",border:"none",color:"#334155",padding:"10px 14px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontFamily:"inherit"}}><Ic n="template" s={13}/>{t.downloadTemplate}</button></div>)}</div>{importOpen&&<ImportModal type={type} t={t} cos={cos} onImportCo={onImportCo} onImportCt={onImportCt} onClose={()=>setImportOpen(false)}/>}{open&&<div style={{position:"fixed",inset:0,zIndex:99}} onClick={()=>setOpen(false)}/>}</>);}
 
 // ─── Kanban ───────────────────────────────────────────────────────────────────
-const Kanban = memo(function Kanban({deals,cos,cts,t,lang,currency,stages,onEdit,onDel,onStage,onViewDeal,fontSizeMode="medium"}){
-  const[drag,setDrag]=useState(null);
-  const[over,setOver]=useState(null);
-  const zoom = fontSizeMode==="small" ? 0.9 : fontSizeMode==="large" ? 1.18 : 1;
-  const closedNames = stages.filter(s=>s.isWon||s.isLost).map(s=>s.name);
-  const wonNames = stages.filter(s=>s.isWon).map(s=>s.name);
-  const pipe=deals.filter(d=>!closedNames.includes(d.stage)).reduce((s,d)=>s+Number(d.value),0);
-  const won=deals.filter(d=>wonNames.includes(d.stage)).reduce((s,d)=>s+Number(d.value),0);
-  return(
-    <div style={{zoom}}>
-      <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
-        {[{l:t.pipelineTotal,v:fv(pipe,currency),c:"#27aae1"},{l:t.closedWon,v:fv(won,currency),c:"#22c55e"},{l:t.totalDeals,v:deals.length,c:"#7c2b83"}].map(s=>(
-          <div key={s.l} style={{background:"#ffffff",border:"1px solid #cfd8e3",borderRadius:12,padding:"10px 16px",flex:1,minWidth:120,boxShadow:'0 4px 12px rgba(15,23,42,.10)'}}>
-            <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:.9,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>{s.l}</div>
-            <div style={{fontSize:20,fontWeight:700,color:s.c,fontFamily:"'Inter',Arial,sans-serif"}}>{s.v}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{display:"flex",gap:9,overflowX:"auto",paddingBottom:10,alignItems:"flex-start"}}>
-        {stages.map(stg=>{
-          const m=stg;
-          const stage=stg.name;
-          const col=deals.filter(d=>d.stage===stage);
-          const colV=col.reduce((s,d)=>s+Number(d.value),0);
-          const isOver=over===stage;
-          return(
-            <div key={stg.id}
-              onDragOver={e=>{e.preventDefault();setOver(stage);}}
-              onDragLeave={()=>setOver(null)}
-              onDrop={e=>{e.preventDefault();if(drag&&drag.stage!==stage)onStage(drag.id,stage);setDrag(null);setOver(null);}}
-              style={{flex:"0 0 205px",background:isOver?m.bg+"f5":m.bg,border:`1px solid ${isOver?m.accent:m.border}`,borderRadius:12,padding:"11px 9px",transition:"all .15s",boxShadow:isOver?`0 0 14px ${m.accent}25, 0 10px 22px rgba(15,23,42,.16)`:'0 6px 16px rgba(15,23,42,.10)'}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7,paddingBottom:7,borderBottom:`1px solid ${m.border}`}}>
-                <div style={{display:"flex",alignItems:"center",gap:5}}>
-                  <span style={{fontSize:12}}>{m.emoji}</span>
-                  <span style={{fontSize:10,fontWeight:600,color:m.accent,fontFamily:"'JetBrains Mono',monospace",letterSpacing:.2}}>{stage}</span>
-                </div>
-                <span style={{fontSize:10,color:"#64748b",background:"#f5f7fa",borderRadius:4,padding:"1px 5px",fontFamily:"'JetBrains Mono',monospace"}}>{col.length}</span>
-              </div>
-              {colV>0&&<div style={{fontSize:10,color:m.accent,marginBottom:7,fontFamily:"'JetBrains Mono',monospace",opacity:.75}}>{fv(colV,currency)}</div>}
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {col.map(dl=>{
-                  const co=cos.find(c=>c.id===dl.companyId);
-                  const ct=cts.find(c=>c.id===dl.contactId);
-                  const latestEv=dl.meddicHistory?.slice(-1)[0];
-                  const mTotal=calcTotal(latestEv?.meddic);
-                  const hasMeddic=dl.meddicHistory?.length>0;
-                  return(
-                    <div key={dl.id} draggable
-                      onDragStart={()=>setDrag(dl)}
-                      onDragEnd={()=>{setDrag(null);setOver(null);}}
-                      style={{background:"#f5f7fa",border:"1px solid #cbd5e1",borderRadius:9,padding:"9px",cursor:"grab",userSelect:"none",opacity:drag?.id===dl.id?.4:1,transition:"opacity .1s"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:3}}>
-                        <div style={{fontSize:12,fontWeight:600,color:"#0f172a",lineHeight:1.3,flex:1}}>{dl.name}</div>
-                        <div style={{display:"flex",gap:1,flexShrink:0}}>
-                          <button onClick={e=>{e.stopPropagation();onViewDeal(dl);}} title="MEDDIC"
-                            style={{background:"none",border:"none",color:"#334155",cursor:"pointer",padding:"2px 3px",opacity:.65}}><Ic n="meddic" s={11}/></button>
-                          <button onClick={e=>{e.stopPropagation();onEdit(dl);}}
-                            style={{background:"none",border:"none",color:m.accent,cursor:"pointer",padding:"2px 3px",opacity:.65}}><Ic n="edit" s={11}/></button>
-                          <button onClick={e=>{e.stopPropagation();onDel(dl.id);}}
-                            style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",padding:"2px 3px",opacity:.55}}><Ic n="trash" s={11}/></button>
-                        </div>
-                      </div>
-                      {Number(dl.value)>0&&<div style={{fontSize:13,fontWeight:700,color:m.accent,marginTop:4,fontFamily:"'Inter',Arial,sans-serif"}}>{fv(dl.value,currency)}</div>}
-                      {co&&<div style={{fontSize:10,color:"#475569",marginTop:3}}>🏢 {co.name}</div>}
-                      {ct&&<div style={{fontSize:10,color:"#475569"}}>👤 {ct.name}</div>}
-                      {dl.closingDate&&<div style={{fontSize:9,color:"#94a3b8",marginTop:4,fontFamily:"'JetBrains Mono',monospace"}}>{t.closing}: {dl.closingDate}</div>}
-
-                      {/* MEDDIC score badge */}
-                      <div style={{marginTop:7,paddingTop:7,borderTop:"1px solid #dce4ec",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}
-                        onClick={e=>{e.stopPropagation();onViewDeal(dl);}}>
-                        {hasMeddic ? (
-                          <>
-                            <div style={{display:"flex",gap:2,alignItems:"center"}}>
-                              {MEDDIC_KEYS.map(k=>{
-                                const meta=MEDDIC_META[k];
-                                const sc=latestEv?.meddic[k]?.score||0;
-                                return(
-                                  <div key={k} title={`${meta.letter}: ${sc}/5`}
-                                    style={{width:14,height:14,borderRadius:3,background:sc>0?meta.color+"33":"#cfd8e3",border:`1px solid ${sc>0?meta.color+"55":"#cfd8e3"}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                                    <span style={{fontSize:7,color:sc>0?meta.color:"#94a3b8",fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{sc}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            <div style={{display:"flex",alignItems:"center",gap:4}}>
-                              <div style={{width:30,height:4,background:"#cfd8e3",borderRadius:2,overflow:"hidden"}}>
-                                <div style={{height:"100%",width:`${(mTotal/30)*100}%`,background:scoreColor(mTotal),borderRadius:2,transition:"width .3s"}}/>
-                              </div>
-                              <span style={{fontSize:9,color:scoreColor(mTotal),fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>{mTotal}/30</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div style={{fontSize:9,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",display:"flex",alignItems:"center",gap:4}}>
-                            <Ic n="meddic" s={9}/>MEDDIC sin evaluar
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {col.length===0&&<div style={{fontSize:10,color:"#cfd8e3",textAlign:"center",padding:"10px 0",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDeals}</div>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
 function ProspectingBoard({ lang, users=[] }) {
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
@@ -2009,11 +1900,20 @@ function AppInner(){
         {/* Content */}
         <main style={{padding:18,zoom:uiZoom}}>
           {tab==="deals"&&(
-            <Kanban deals={fDl} cos={cos} cts={cts} t={t} lang={lang} currency={currency} stages={stages}
+            <Kanban
+              deals={fDl}
+              cos={cos}
+              cts={cts}
+              t={t}
+              currency={currency}
+              stages={stages}
               onEdit={d=>setModal({type:"deal",data:d})}
-              onDel={requestDelDl} onStage={chStage}
+              onDel={requestDelDl}
+              onStage={chStage}
               onViewDeal={d=>setViewDeal({...dls.find(x=>x.id===d.id)})}
-              fontSizeMode={pipelineFontSize}/>
+              fontSizeMode={pipelineFontSize}
+              helpers={{ fv, calcTotal, scoreColor, MEDDIC_KEYS, MEDDIC_META, Ic }}
+            />
           )}
           {tab==="companies"&&(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:11}}>
