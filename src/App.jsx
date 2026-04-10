@@ -1094,7 +1094,10 @@ function AppInner(){
 
   // ── CRUD operations ──
   const ensureSbOk = (result, op) => {
-    if (result?.error) throw new Error(`${op}: ${result.error.message}`);
+    if (result?.error) {
+      const details = [result.error.message, result.error.details, result.error.hint].filter(Boolean).join(' | ');
+      throw new Error(`${op}: ${details || 'Supabase error'}`);
+    }
     return result;
   };
 
@@ -1273,9 +1276,13 @@ function AppInner(){
       name: dl.name,
       onDelete: async()=>{
         const ok = await withSaveStatus(async()=>{
-          ensureSbOk(await supabase.from('deal_activities').delete().eq('deal_id', id), 'delete deal activities');
-          ensureSbOk(await supabase.from('meddic_evals').delete().eq('deal_id', id), 'delete deal meddic evals');
-          ensureSbOk(await supabase.from('deals').delete().eq('id', id), 'delete deal');
+          ensureSbOk(await supabase.from('deal_activities').delete().eq('deal_id', id).select('id'), 'delete deal activities');
+          ensureSbOk(await supabase.from('meddic_evals').delete().eq('deal_id', id).select('id'), 'delete deal meddic evals');
+          const dealDeleteRes = await supabase.from('deals').delete().eq('id', id).select('id,name');
+          ensureSbOk(dealDeleteRes, 'delete deal');
+          if (!dealDeleteRes.data || dealDeleteRes.data.length === 0) {
+            throw new Error('No se pudo eliminar el deal en base de datos. Posible permiso/RLS o id no encontrado.');
+          }
         });
         if(!ok) return;
         setDls(p=>p.filter(d=>d.id!==id));
