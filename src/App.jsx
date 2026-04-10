@@ -1988,7 +1988,7 @@ function AppInner(){
   };
   const chStage=(id,stage)=>setDls(p=>p.map(d=>d.id===id?{...d,stage}:d));
 
-  const savePipelineStages = (nextStages) => {
+  const savePipelineStages = async (nextStages) => {
     // Keep deals visible when a stage is renamed: migrate deal.stage oldName -> newName by stage id.
     const renameMap = new Map();
     stages.forEach((prevStage) => {
@@ -1998,16 +1998,50 @@ function AppInner(){
       }
     });
 
-    if (renameMap.size > 0) {
-      setDls(prevDeals => prevDeals.map(d => (
-        renameMap.has(d.stage) ? { ...d, stage: renameMap.get(d.stage) } : d
-      )));
-      if (viewDeal && renameMap.has(viewDeal.stage)) {
-        setViewDeal(prev => prev ? { ...prev, stage: renameMap.get(prev.stage) } : prev);
-      }
-    }
+    const nextDeals = renameMap.size > 0
+      ? dls.map(d => (renameMap.has(d.stage) ? { ...d, stage: renameMap.get(d.stage) } : d))
+      : dls;
 
+    const nextViewDeal = viewDeal && renameMap.has(viewDeal.stage)
+      ? { ...viewDeal, stage: renameMap.get(viewDeal.stage) }
+      : viewDeal;
+
+    const ok = await withSaveStatus(async()=>{
+      const stageRows = nextStages.map((s, i) => ({
+        id: s.id,
+        name: s.name,
+        emoji: s.emoji,
+        bg: s.bg,
+        border: s.border,
+        accent: s.accent,
+        is_won: s.isWon,
+        is_lost: s.isLost,
+        position: i,
+      }));
+      ensureSbOk(await supabase.from('pipeline_stages').upsert(stageRows, { onConflict:'id' }), 'save pipeline stages');
+
+      const existingIdsRes = await supabase.from('pipeline_stages').select('id');
+      ensureSbOk(existingIdsRes, 'load existing pipeline stages');
+      const staleStageIds = (existingIdsRes.data || []).map(s => s.id).filter(id => !new Set(nextStages.map(s => s.id)).has(id));
+      if (staleStageIds.length > 0) {
+        ensureSbOk(await supabase.from('pipeline_stages').delete().in('id', staleStageIds), 'delete stale pipeline stages');
+      }
+
+      if (renameMap.size > 0) {
+        for (const [prevName, nextName] of renameMap.entries()) {
+          ensureSbOk(await supabase.from('deals').update({ stage: nextName }).eq('stage', prevName), `rename deals stage ${prevName}`);
+        }
+      }
+    });
+
+    if (!ok) return;
+
+    if (renameMap.size > 0) {
+      setDls(nextDeals);
+      if (nextViewDeal) setViewDeal(nextViewDeal);
+    }
     setStages(nextStages);
+    setPipelineEditorOpen(false);
   };
 
   // ── Delete with confirmation ──
@@ -2102,34 +2136,83 @@ function AppInner(){
     });
   };
 
-  const addActivity=(dealId, activity)=>{
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]),activity]}:d));
-    setViewDeal(p=>p&&p.id===dealId?{...p,activities:[...(p.activities||[]),activity]}:p);
+  const addActivity=async(dealId, activity)=>{
+    const row = {
+      ...activity,
+      id: activity.id || uid(),
+      createdAt: activity.createdAt || new Date().toISOString(),
+      updatedAt: activity.updatedAt || new Date().toISOString(),
+      completedAt: activity.status === "done" ? (activity.completedAt || new Date().toISOString()) : (activity.completedAt || null),
+    };
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deal_activities').upsert([{
+        id: row.id,
+        deal_id: dealId,
+        type: row.type,
+        title: row.title,
+        due_date: row.dueDate || null,
+        responsible: row.responsible || "",
+        status: row.status || "pending",
+        comment: row.comment || "",
+        created_at: row.createdAt,
+        updated_at: row.updatedAt,
+        completed_at: row.completedAt || null,
+      }], { onConflict:'id' });
+      ensureSbOk(res, 'add deal activity');
+    });
+    if(!ok) return;
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]),row]}:d));
+    setViewDeal(p=>p&&p.id===dealId?{...p,activities:[...(p.activities||[]),row]}:p);
   };
-  const deleteActivity=(dealId, activityId)=>{
+  const deleteActivity=async(dealId, activityId)=>{
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deal_activities').delete().eq('id', activityId);
+      ensureSbOk(res, 'delete deal activity');
+    });
+    if(!ok) return;
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).filter(a=>a.id!==activityId)}:d));
     setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).filter(a=>a.id!==activityId)}:p);
-    if (supabase) {
-      supabase.from('deal_activities').delete().eq('id', activityId).then(()=>{}).catch(()=>{});
-    }
   };
-  const updateActivityStatus=(dealId, activityId, status)=>{
+  const updateActivityStatus=async(dealId, activityId, status)=>{
     const nowIso = new Date().toISOString();
+    const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
+    const completedAt = status === "done" ? ((current && current.completedAt) || nowIso) : null;
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deal_activities').update({ status, completed_at: completedAt, updated_at: nowIso }).eq('id', activityId);
+      ensureSbOk(res, 'update deal activity status');
+    });
+    if(!ok) return;
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>{
       if(a.id!==activityId) return a;
-      const completedAt = status === "done" ? (a.completedAt || nowIso) : null;
       return { ...a, status, completedAt, updatedAt: nowIso };
     })}:d));
     setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>{
       if(a.id!==activityId) return a;
-      const completedAt = status === "done" ? (a.completedAt || nowIso) : null;
       return { ...a, status, completedAt, updatedAt: nowIso };
     })}:p);
   };
 
-  const updateActivity=(dealId, activityId, patch)=>{
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?{...a,...patch}:a)}:d));
-    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?{...a,...patch}:a)}:p);
+  const updateActivity=async(dealId, activityId, patch)=>{
+    const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
+    if(!current) return;
+    const nowIso = new Date().toISOString();
+    const next = { ...current, ...patch, updatedAt: nowIso };
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deal_activities').update({
+        type: next.type,
+        title: next.title,
+        due_date: next.dueDate || null,
+        responsible: next.responsible || "",
+        status: next.status || "pending",
+        comment: next.comment || "",
+        updated_at: next.updatedAt,
+        completed_at: next.completedAt || null,
+      }).eq('id', activityId);
+      ensureSbOk(res, 'update deal activity');
+    });
+    if(!ok) return;
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?next:a)}:d));
+    setViewDeal(p=>p&&p.id===dealId?{...p,activities:(p.activities||[]).map(a=>a.id===activityId?next:a)}:p);
   };
 
   const openDealActivities=(dealId)=>{
