@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, useReducer, memo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import Papa from "papaparse";
 import { supabase } from './supabaseClient.js'
+import { CRMProvider, useCRM } from './state/CRMContext.jsx'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -488,34 +489,6 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
   }
 }
 
-// ---- Unified API ----
-async function storageGet(fallback) {
-  const sbData = await supabaseLoad();
-  if (sbData) {
-    return {
-      co: sbData.co,
-      ct: sbData.ct.map(c => ({ ...c, titleF: c.title_f, companyId: c.company_id })),
-      dl: sbData.dl.map(d => ({ ...d, companyId: d.company_id, contactId: d.contact_id, closingDate: d.closing_date, leadSource: d.lead_source || "", leadSourceCustom: d.lead_source_custom || "" })),
-      users: sbData.users || fallback.users,
-      currency: fallback.currency || "USD",
-      stages: sbData.stages || fallback.stages,
-      __source: "supabase",
-    };
-  }
-
-  // Safety-first: never auto-load sample/local data into the live app,
-  // so we avoid accidental overwrites of real database content.
-  return {
-    co: [],
-    ct: [],
-    dl: [],
-    users: fallback.users || [],
-    currency: "USD",
-    stages: fallback.stages || DEFAULT_STAGES,
-    __source: "empty",
-  };
-}
-
 async function storageSave(data) {
   const sbOk = await supabaseSaveAll({ cos: data.co, cts: data.ct, dls: data.dl, stages: data.stages, users: data.users || [] });
   return sbOk;
@@ -533,107 +506,7 @@ const SDL=[
 const SAMPLE_USERS = [{id:"u1",name:"Edu",alias:"Edu",email:"eduardo.bolanos@intelsius.com"}];
 const SAMPLE_DATA = { co: SC, ct: SCT, dl: SDL, users: SAMPLE_USERS, currency: "USD", stages: DEFAULT_STAGES };
 
-// ─── CRM Data Context & Reducer ───────────────────────────────────────────────
-const CRMContext = createContext(null);
-const useCRM = () => useContext(CRMContext);
-
-const initialDataState = { cos:[], cts:[], dls:[], users:[], currency:"USD", stages:DEFAULT_STAGES };
-
-function crmReducer(state, action) {
-  switch(action.type) {
-    case "LOAD":       return { ...state, ...action.payload };
-    case "SET_COS":    return { ...state, cos: typeof action.payload==="function"?action.payload(state.cos):action.payload };
-    case "SET_CTS":    return { ...state, cts: typeof action.payload==="function"?action.payload(state.cts):action.payload };
-    case "SET_DLS":    return { ...state, dls: typeof action.payload==="function"?action.payload(state.dls):action.payload };
-    case "SET_USERS":  return { ...state, users: typeof action.payload==="function"?action.payload(state.users):action.payload };
-    case "SET_CURRENCY": return { ...state, currency: action.payload };
-    case "SET_STAGES": return { ...state, stages: action.payload };
-    default: return state;
-  }
-}
-
-function CRMProvider({ children }) {
-  const [data, dispatch] = useReducer(crmReducer, initialDataState);
-  const [loading, setLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState("idle");
-  const [saveMessage, setSaveMessage] = useState("");
-  const initialLoadDone = useRef(false);
-  const canAutoSave = useRef(true);
-  const saveQueue = useRef(Promise.resolve());
-
-  const reloadFromSupabase = useCallback(async()=>{
-    const loaded = await storageGet(SAMPLE_DATA);
-    canAutoSave.current = loaded.__source === "supabase";
-    dispatch({ type:"LOAD", payload:{ cos:loaded.co, cts:loaded.ct, dls:loaded.dl, users:loaded.users||[], currency:loaded.currency||"USD", stages:loaded.stages||DEFAULT_STAGES }});
-    return loaded;
-  },[]);
-
-  // Load
-  useEffect(()=>{
-    let cancelled = false;
-    (async()=>{
-      const loaded = await storageGet(SAMPLE_DATA);
-      if(!cancelled){
-        // Save is allowed only when initial load came from Supabase.
-        canAutoSave.current = loaded.__source === "supabase";
-        dispatch({ type:"LOAD", payload:{ cos:loaded.co, cts:loaded.ct, dls:loaded.dl, users:loaded.users||[], currency:loaded.currency||"USD", stages:loaded.stages||DEFAULT_STAGES }});
-        setLoading(false);
-        setTimeout(()=>{ initialLoadDone.current = true; }, 50);
-      }
-    })();
-    return ()=>{ cancelled = true; };
-  },[]);
-
-  // Immediate queued save (no debounce): saves right away while serializing writes.
-  useEffect(()=>{
-    if(!initialLoadDone.current) return;
-    if(!canAutoSave.current) {
-      setSaveStatus("error");
-      return;
-    }
-
-    saveQueue.current = saveQueue.current.then(async()=>{
-      setSaveStatus("saving");
-      const ok = await storageSave({ co:data.cos, ct:data.cts, dl:data.dls, users:data.users, currency:data.currency, stages:data.stages });
-      setSaveStatus(ok?"saved":"error");
-      setTimeout(()=>setSaveStatus("idle"), 1000);
-    }).catch(()=>setSaveStatus("error"));
-  },[data]);
-
-  useEffect(()=>{
-    if(!supabase) return;
-
-    const tables = ['deals', 'deal_activities', 'meddic_evals', 'companies', 'contacts', 'pipeline_stages', 'crm_users'];
-    const channels = tables.map((table)=>
-      supabase
-        .channel(`crm-realtime-${table}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table }, async()=>{
-          if (!initialLoadDone.current) return;
-          await reloadFromSupabase();
-        })
-        .subscribe()
-    );
-
-    return ()=>{
-      channels.forEach((channel)=>{
-        supabase.removeChannel(channel);
-      });
-    };
-  },[reloadFromSupabase]);
-
-  const ctx = useMemo(()=>({
-    ...data, dispatch, loading, saveStatus, saveMessage, setSaveStatus, setSaveMessage, reloadFromSupabase,
-    // Convenience setters
-    setCos: p => dispatch({type:"SET_COS",payload:p}),
-    setCts: p => dispatch({type:"SET_CTS",payload:p}),
-    setDls: p => dispatch({type:"SET_DLS",payload:p}),
-    setUsers: p => dispatch({type:"SET_USERS",payload:p}),
-    setCurrency: v => dispatch({type:"SET_CURRENCY",payload:v}),
-    setStages: v => dispatch({type:"SET_STAGES",payload:v}),
-  }),[data, loading, saveStatus, saveMessage, reloadFromSupabase]);
-
-  return <CRMContext.Provider value={ctx}>{children}</CRMContext.Provider>;
-}
+// CRM state/provider moved to ./state/CRMContext.jsx
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const Ic = ({n,s=15})=>{
@@ -2458,7 +2331,7 @@ function AppInner(){
 // ─── App (wraps AppInner with CRMProvider) ────────────────────────────────────
 export default function App(){
   return(
-    <CRMProvider>
+    <CRMProvider sampleData={SAMPLE_DATA} defaultStages={DEFAULT_STAGES}>
       <AppInner/>
     </CRMProvider>
   );
