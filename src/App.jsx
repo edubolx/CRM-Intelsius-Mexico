@@ -1120,6 +1120,7 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
   const makeEmptyForm = () => ({ type:"task", title:"", dueDate:today(), responsible:"", status:"pending", comment:"" });
   const [form, setForm] = useState(makeEmptyForm);
   const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
   const setF = (k,v) => setForm(p=>({...p,[k]:v}));
 
   const typeOpts = ACTIVITY_TYPES.map(v=>({v,l:t[v]}));
@@ -1128,15 +1129,20 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
   const resetForm = () => { setForm(makeEmptyForm()); setEditingId(null); };
 
   const handleSave = async () => {
-    if(!form.title?.trim()) return;
-    if(editingId){
-      await onUpdateActivity(editingId, {...form, title: form.title.trim()});
+    if(!form.title?.trim() || saving) return;
+    setSaving(true);
+    try {
+      if(editingId){
+        await onUpdateActivity(editingId, {...form, title: form.title.trim()});
+        resetForm();
+        return;
+      }
+      const nowIso = new Date().toISOString();
+      await onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: nowIso, updatedAt: nowIso, completedAt: form.status === "done" ? nowIso : null });
       resetForm();
-      return;
+    } finally {
+      setSaving(false);
     }
-    const nowIso = new Date().toISOString();
-    await onAddActivity({ id: uid(), ...form, title: form.title.trim(), createdAt: nowIso, updatedAt: nowIso, completedAt: form.status === "done" ? nowIso : null });
-    resetForm();
   };
 
   const startEdit = (a) => {
@@ -1163,7 +1169,7 @@ function ActivitiesPanel({deal,t,users,onAddActivity,onDeleteActivity,onUpdateAc
       <Txta label={t.activityComment} value={form.comment} onChange={e=>setF("comment",e.target.value)} />
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:8}}>
         {editingId && <Btn v="ghost" ch={t.cancel} onClick={resetForm}/>}        
-        <Btn ch={<><Ic n={editingId?"check":"plus"} s={12}/>{editingId?t.activityUpdate:t.addActivity}</>} onClick={handleSave}/>
+        <Btn ch={<><Ic n={editingId?"check":"plus"} s={12}/>{saving ? (t.saving || 'Guardando...') : (editingId?t.activityUpdate:t.addActivity)}</>} onClick={handleSave} sx={{opacity:saving?0.65:1,pointerEvents:saving?'none':'auto'}}/>
       </div>
 
       <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
