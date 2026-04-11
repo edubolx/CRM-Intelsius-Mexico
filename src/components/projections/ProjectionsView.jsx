@@ -135,6 +135,31 @@ function ProjectionModeSelect({ value, onChange, disabled, labels }) {
   );
 }
 
+function RevenueTypeSelect({ value, onChange, disabled, labels }) {
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: "100%",
+        background: "#f8fafc",
+        border: "1px solid #cfd8e3",
+        borderRadius: 10,
+        padding: "8px 10px",
+        color: "#0f172a",
+        fontSize: 12,
+        fontFamily: "inherit",
+        outline: "none"
+      }}
+    >
+      <option value="singleuse">{labels.singleuse}</option>
+      <option value="multiuse">{labels.multiuse}</option>
+      <option value="renta">{labels.renta}</option>
+    </select>
+  );
+}
+
 function MoneyInput({ value, onCommit, disabled }) {
   const [draft, setDraft] = useState(String(Number(value || 0)));
 
@@ -236,19 +261,21 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
           value: Number(deal.value) || 0,
           closingDate: deal.closingDate || deal.closing_date || "",
           uiMode,
+          revenueType: projection?.revenue_type || "singleuse",
         };
       });
   }, [deals, dealProjections]);
 
   const saveProjectionMode = useCallback(async (dealId, uiMode) => {
     if (!supabase) return;
+    const current = (dealProjections || []).find((row) => row.deal_id === dealId) || {};
     const payload = uiMode === "custom_6"
-      ? { deal_id: dealId, mode: "custom_months", custom_months: 6 }
+      ? { deal_id: dealId, mode: "custom_months", custom_months: 6, revenue_type: current.revenue_type || "singleuse" }
       : uiMode === "custom_3"
-      ? { deal_id: dealId, mode: "custom_months", custom_months: 3 }
+      ? { deal_id: dealId, mode: "custom_months", custom_months: 3, revenue_type: current.revenue_type || "singleuse" }
       : uiMode === "twelve_months"
-      ? { deal_id: dealId, mode: "twelve_months", custom_months: null }
-      : { deal_id: dealId, mode: "one_time", custom_months: null };
+      ? { deal_id: dealId, mode: "twelve_months", custom_months: null, revenue_type: current.revenue_type || "singleuse" }
+      : { deal_id: dealId, mode: "one_time", custom_months: null, revenue_type: current.revenue_type || "singleuse" };
 
     setSavingDealId(dealId);
     setDealProjections((prev) => {
@@ -262,7 +289,31 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       setError(upsertError.message || (lang === "es" ? "No se pudo guardar la proyección del deal." : "Could not save deal projection."));
       await load();
     }
-  }, [lang, load]);
+  }, [dealProjections, lang, load]);
+
+  const saveRevenueType = useCallback(async (dealId, revenueType) => {
+    if (!supabase) return;
+    const current = (dealProjections || []).find((row) => row.deal_id === dealId) || {};
+    const payload = {
+      deal_id: dealId,
+      mode: current.mode || 'one_time',
+      custom_months: current.custom_months ?? null,
+      revenue_type: revenueType,
+    };
+
+    setSavingDealId(dealId);
+    setDealProjections((prev) => {
+      const others = (prev || []).filter((row) => row.deal_id !== dealId);
+      return [...others, payload];
+    });
+
+    const { error: upsertError } = await supabase.from('deal_projections').upsert([payload], { onConflict: 'deal_id' });
+    setSavingDealId("");
+    if (upsertError) {
+      setError(upsertError.message || (lang === 'es' ? 'No se pudo guardar el tipo de deal.' : 'Could not save deal type.'));
+      await load();
+    }
+  }, [dealProjections, lang, load]);
 
   const saveMonthlyField = useCallback(async (rowKey, field, nextValue) => {
     if (!supabase) return;
@@ -373,7 +424,11 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       dealValue: "Valor",
       dealClose: "Cierre",
       dealMode: "Período",
+      revenueType: "Tipo de deal",
       oneTime: "Pago único",
+      multiuse: "Venta Multiuse",
+      renta: "Renta",
+      singleuse: "Venta Singleuse",
       threeMonths: "3 meses",
       sixMonths: "6 meses",
       twelveMonths: "12 meses",
@@ -409,7 +464,11 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       dealValue: "Value",
       dealClose: "Close",
       dealMode: "Period",
+      revenueType: "Deal type",
       oneTime: "One-time",
+      multiuse: "Multiuse Sale",
+      renta: "Rental",
+      singleuse: "Singleuse Sale",
       threeMonths: "3 months",
       sixMonths: "6 months",
       twelveMonths: "12 months",
@@ -445,7 +504,11 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     dealValue: "Value",
     dealClose: "Close",
     dealMode: "Period",
+    revenueType: "Deal type",
     oneTime: "One-time",
+    multiuse: "Multiuse Sale",
+    renta: "Rental",
+    singleuse: "Singleuse Sale",
     threeMonths: "3 months",
     sixMonths: "6 months",
     twelveMonths: "12 months",
@@ -499,7 +562,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: "#f8fafc", color: "#334155" }}>
-                    {[copy.dealName, copy.dealStage, copy.dealValue, copy.dealClose, copy.dealMode].map((header) => (
+                    {[copy.dealName, copy.dealStage, copy.dealValue, copy.dealClose, copy.dealMode, copy.revenueType].map((header) => (
                       <th key={header} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{header}</th>
                     ))}
                   </tr>
@@ -517,6 +580,14 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
                           disabled={savingDealId === row.id}
                           onChange={(nextValue) => saveProjectionMode(row.id, nextValue)}
                           labels={{ oneTime: copy.oneTime, threeMonths: copy.threeMonths, sixMonths: copy.sixMonths, twelveMonths: copy.twelveMonths }}
+                        />
+                      </td>
+                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", minWidth: 190 }}>
+                        <RevenueTypeSelect
+                          value={row.revenueType}
+                          disabled={savingDealId === row.id}
+                          onChange={(nextValue) => saveRevenueType(row.id, nextValue)}
+                          labels={{ singleuse: copy.singleuse, multiuse: copy.multiuse, renta: copy.renta }}
                         />
                       </td>
                     </tr>
