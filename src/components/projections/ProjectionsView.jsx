@@ -135,6 +135,39 @@ function ProjectionModeSelect({ value, onChange, disabled, labels }) {
   );
 }
 
+function MoneyInput({ value, onCommit, disabled }) {
+  const [draft, setDraft] = useState(String(Number(value || 0)));
+
+  useEffect(() => {
+    setDraft(String(Number(value || 0)));
+  }, [value]);
+
+  return (
+    <input
+      value={draft}
+      disabled={disabled}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        const parsed = Number(String(draft).replace(/[^0-9.-]/g, ""));
+        onCommit(Number.isFinite(parsed) ? parsed : 0);
+      }}
+      style={{
+        width: 120,
+        background: disabled ? "#f1f5f9" : "#ffffff",
+        border: "1px solid #cfd8e3",
+        borderRadius: 8,
+        padding: "7px 9px",
+        color: "#0f172a",
+        fontSize: 12,
+        fontFamily: "inherit",
+        outline: "none",
+        textAlign: "right"
+      }}
+      inputMode="decimal"
+    />
+  );
+}
+
 function KpiCard({ title, value, subtitle, color }) {
   return (
     <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, boxShadow: "0 6px 18px rgba(15,23,42,.08)" }}>
@@ -151,6 +184,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savingDealId, setSavingDealId] = useState("");
+  const [savingMonthKey, setSavingMonthKey] = useState("");
 
   const load = useCallback(async () => {
     if (!supabase) {
@@ -229,6 +263,41 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       await load();
     }
   }, [lang, load]);
+
+  const saveMonthlyField = useCallback(async (rowKey, field, nextValue) => {
+    if (!supabase) return;
+    setSavingMonthKey(`${rowKey}:${field}`);
+    setTargets((prev) => {
+      const existing = (prev || []).find((row) => monthKey(row.month_start) === rowKey);
+      if (existing) {
+        return (prev || []).map((row) => monthKey(row.month_start) === rowKey ? { ...row, [field]: nextValue } : row);
+      }
+      return [
+        ...(prev || []),
+        {
+          month_start: `${rowKey}-01`,
+          budget_amount: field === 'budget_amount' ? nextValue : 0,
+          actual_amount: 0,
+          expected_expense_amount: field === 'expected_expense_amount' ? nextValue : 0,
+        }
+      ];
+    });
+
+    const existing = (targets || []).find((row) => monthKey(row.month_start) === rowKey);
+    const payload = {
+      month_start: `${rowKey}-01`,
+      budget_amount: field === 'budget_amount' ? nextValue : Number(existing?.budget_amount || 0),
+      actual_amount: Number(existing?.actual_amount || 0),
+      expected_expense_amount: field === 'expected_expense_amount' ? nextValue : Number(existing?.expected_expense_amount || 0),
+    };
+
+    const { error: upsertError } = await supabase.from('monthly_targets_actuals').upsert([payload], { onConflict: 'month_start' });
+    setSavingMonthKey("");
+    if (upsertError) {
+      setError(upsertError.message || (lang === 'es' ? 'No se pudo guardar el valor mensual.' : 'Could not save monthly value.'));
+      await load();
+    }
+  }, [lang, load, targets]);
 
   const model = useMemo(() => {
     const months = buildMonths();
@@ -309,6 +378,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       sixMonths: "6 meses",
       twelveMonths: "12 meses",
       saving: "Guardando...",
+      editableHint: "Corporate Target (HQ) y Expected Expenses se pueden editar aquí.",
       refresh: "Refrescar",
       loading: "Cargando proyecciones...",
       noData: "No hay datos todavía.",
@@ -344,6 +414,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       sixMonths: "6 months",
       twelveMonths: "12 months",
       saving: "Saving...",
+      editableHint: "Corporate Target (HQ) and Expected Expenses can be edited here.",
       refresh: "Refresh",
       loading: "Loading projections...",
       noData: "No data yet.",
@@ -379,6 +450,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     sixMonths: "6 months",
     twelveMonths: "12 months",
     saving: "Saving...",
+    editableHint: "",
     refresh: "Refresh",
     loading: "Loading...",
     noData: "No data.",
@@ -470,7 +542,10 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
           </div>
 
           <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: 16, borderBottom: "1px solid #e2e8f0", fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{copy.monthlyTable}</div>
+            <div style={{ padding: 16, borderBottom: "1px solid #e2e8f0", fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
+              <div>{copy.monthlyTable}</div>
+              <div style={{ fontSize: 11, fontWeight: 400, color: "#64748b", marginTop: 4 }}>{copy.editableHint}</div>
+            </div>
             {model.rows.length === 0 ? (
               <div style={{ padding: 16, color: "#64748b" }}>{copy.noData}</div>
             ) : (
@@ -488,9 +563,13 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
                       <tr key={row.key}>
                         <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", color: "#0f172a", fontWeight: 500 }}>{row.label}</td>
                         <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{fmtMoney(row.estimatedPipeline, currency)}</td>
-                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{fmtMoney(row.corporateTarget, currency)}</td>
+                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                          <MoneyInput value={row.corporateTarget} disabled={savingMonthKey === `${row.key}:budget_amount`} onCommit={(nextValue) => saveMonthlyField(row.key, 'budget_amount', nextValue)} />
+                        </td>
                         <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{fmtMoney(row.actualSales, currency)}</td>
-                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{fmtMoney(row.expectedExpenses, currency)}</td>
+                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                          <MoneyInput value={row.expectedExpenses} disabled={savingMonthKey === `${row.key}:expected_expense_amount`} onCommit={(nextValue) => saveMonthlyField(row.key, 'expected_expense_amount', nextValue)} />
+                        </td>
                         <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{fmtMoney(row.weightedPipeline, currency)}</td>
                       </tr>
                     ))}
