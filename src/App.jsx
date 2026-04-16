@@ -864,8 +864,10 @@ function MeddicPanel({deal, lang, t, onSaveEval, onDeleteEval}){
   const setScore = (k,v) => setDraft(p=>({...p, meddic:{...p.meddic,[k]:{...p.meddic[k],score:v}}}));
   const setNotes = (k,v) => setDraft(p=>({...p, meddic:{...p.meddic,[k]:{...p.meddic[k],notes:v}}}));
 
-  const handleSave = () => {
-    onSaveEval({ id:uid(), date:draft.date, meddic:draft.meddic });
+  const handleSave = async () => {
+    const existingId = latest?.id || uid();
+    const ok = await onSaveEval({ id:existingId, date:draft.date, meddic:draft.meddic });
+    if(!ok) return;
     setSaveNotice(true);
     setTimeout(()=>setSaveNotice(false), 1800);
   };
@@ -1358,28 +1360,55 @@ function AppInner(){
     }
   };
 
-  const saveEval=(dealId,ev)=>{
-    setDls(p=>p.map(d=>{
-      if(d.id!==dealId)return d;
-      const hist=[...(d.meddicHistory||[]),ev];
-      return{...d,meddicHistory:hist};
-    }));
-    setViewDeal(p=>{
-      if(!p||p.id!==dealId)return p;
-      const hist=[...(p.meddicHistory||[]),ev];
-      return{...p,meddicHistory:hist};
+  const saveEval=async(dealId,ev)=>{
+    const currentDeal = dls.find(d=>d.id===dealId);
+    if(!currentDeal) return false;
+
+    const previousHistory = [...(currentDeal.meddicHistory || [])];
+    const existingIndex = previousHistory.findIndex(entry => entry.id === ev.id);
+    const nextHistory = existingIndex >= 0
+      ? previousHistory.map(entry => entry.id === ev.id ? ev : entry)
+      : [...previousHistory, ev];
+
+    setDls(p=>p.map(d=>d.id===dealId?{...d,meddicHistory:nextHistory}:d));
+    if(viewDeal?.id===dealId) setViewDeal(p=>p?{...p,meddicHistory:nextHistory}:p);
+
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('meddic_evals').upsert([{ id:ev.id, deal_id:dealId, date:ev.date, meddic:ev.meddic }], { onConflict:'id' });
+      ensureSbOk(res, 'save meddic eval');
     });
+
+    if(!ok){
+      setDls(p=>p.map(d=>d.id===dealId?{...d,meddicHistory:previousHistory}:d));
+      if(viewDeal?.id===dealId) setViewDeal(p=>p?{...p,meddicHistory:previousHistory}:p);
+      return false;
+    }
+
+    return true;
   };
 
-  const deleteEval=(dealId, evalId)=>{
-    setDls(p=>p.map(d=>{
-      if(d.id!==dealId)return d;
-      return {...d, meddicHistory:(d.meddicHistory||[]).filter(e=>e.id!==evalId)};
-    }));
-    setViewDeal(p=>{
-      if(!p||p.id!==dealId)return p;
-      return {...p, meddicHistory:(p.meddicHistory||[]).filter(e=>e.id!==evalId)};
+  const deleteEval=async(dealId, evalId)=>{
+    const currentDeal = dls.find(d=>d.id===dealId);
+    if(!currentDeal) return false;
+
+    const previousHistory = [...(currentDeal.meddicHistory || [])];
+    const nextHistory = previousHistory.filter(e=>e.id!==evalId);
+
+    setDls(p=>p.map(d=>d.id===dealId?{...d,meddicHistory:nextHistory}:d));
+    if(viewDeal?.id===dealId) setViewDeal(p=>p?{...p,meddicHistory:nextHistory}:p);
+
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('meddic_evals').delete().eq('id', evalId);
+      ensureSbOk(res, 'delete meddic eval');
     });
+
+    if(!ok){
+      setDls(p=>p.map(d=>d.id===dealId?{...d,meddicHistory:previousHistory}:d));
+      if(viewDeal?.id===dealId) setViewDeal(p=>p?{...p,meddicHistory:previousHistory}:p);
+      return false;
+    }
+
+    return true;
   };
 
   const addActivity=async(dealId, activity)=>{
