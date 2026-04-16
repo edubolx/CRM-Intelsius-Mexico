@@ -1201,7 +1201,28 @@ function AppInner(){
     if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
     return { ok:true, id: row.id };
   };
-  const chStage=(id,stage)=>setDls(p=>p.map(d=>d.id===id?{...d,stage}:d));
+  const chStage=async(id,stage)=>{
+    const currentDeal = dls.find(d=>d.id===id);
+    if(!currentDeal || currentDeal.stage===stage) return true;
+
+    const previousStage = currentDeal.stage;
+
+    setDls(p=>p.map(d=>d.id===id?{...d,stage}:d));
+    if(viewDeal?.id===id) setViewDeal(p=>p?{...p,stage}:p);
+
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deals').update({ stage }).eq('id', id);
+      ensureSbOk(res, 'update deal stage');
+    });
+
+    if(!ok){
+      setDls(p=>p.map(d=>d.id===id?{...d,stage:previousStage}:d));
+      if(viewDeal?.id===id) setViewDeal(p=>p?{...p,stage:previousStage}:p);
+      return false;
+    }
+
+    return true;
+  };
 
   const savePipelineStages = async (nextStages) => {
     // Keep deals visible when a stage is renamed: migrate deal.stage oldName -> newName by stage id.
