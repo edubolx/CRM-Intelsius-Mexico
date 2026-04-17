@@ -23,12 +23,21 @@ const STAGE_WEIGHT_HINTS = [
   { match: ["hold", "pause", "pausa", "congel"], weight: 0 },
 ];
 
+const WON_STAGE_HINTS = ["won", "ganado", "closed won", "cerrado ganado"];
+
 function inferStageWeight(stageName = "") {
   const v = String(stageName).toLowerCase();
   for (const rule of STAGE_WEIGHT_HINTS) {
     if (rule.match.some((token) => v.includes(token))) return rule.weight;
   }
   return 0.5;
+}
+
+function isWonStage(stageName = "", stages = []) {
+  const exact = (stages || []).find((s) => s.name === stageName);
+  if (exact?.isWon) return true;
+  const v = String(stageName).toLowerCase();
+  return WON_STAGE_HINTS.some((token) => v.includes(token));
 }
 
 function buildMonths() {
@@ -160,7 +169,7 @@ function RevenueTypeSelect({ value, onChange, disabled, labels }) {
   );
 }
 
-function MoneyInput({ value, onCommit, disabled }) {
+function MoneyInput({ value, onCommit, disabled, placeholder }) {
   const [draft, setDraft] = useState(String(Number(value || 0)));
 
   useEffect(() => {
@@ -170,6 +179,7 @@ function MoneyInput({ value, onCommit, disabled }) {
   return (
     <input
       value={draft}
+      placeholder={placeholder}
       disabled={disabled}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
@@ -338,7 +348,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     const payload = {
       month_start: `${rowKey}-01`,
       budget_amount: field === 'budget_amount' ? nextValue : Number(existing?.budget_amount || 0),
-      actual_amount: Number(existing?.actual_amount || 0),
+      actual_amount: field === 'actual_amount' ? nextValue : Number(existing?.actual_amount || 0),
       expected_expense_amount: field === 'expected_expense_amount' ? nextValue : Number(existing?.expected_expense_amount || 0),
     };
 
@@ -363,7 +373,9 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       estimatedPipeline: 0,
       weightedPipeline: 0,
       corporateTarget: Number(targetMap.get(monthKey(m))?.budget_amount) || 0,
-      actualSales: Number(targetMap.get(monthKey(m))?.actual_amount) || 0,
+      actualSales: 0,
+      actualSalesAuto: 0,
+      actualSalesManual: null,
       expectedExpenses: Number(targetMap.get(monthKey(m))?.expected_expense_amount) || 0,
     }));
 
@@ -380,6 +392,21 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
         rows[idx].estimatedPipeline += amount;
         rows[idx].weightedPipeline += amount * stageWeight;
       });
+    });
+
+    (deals || []).forEach((deal) => {
+      if (!isWonStage(deal.stage, stages)) return;
+      const wonKey = monthKey(deal.closingDate || deal.closing_date || "");
+      const idx = keys.indexOf(wonKey);
+      if (idx === -1) return;
+      rows[idx].actualSalesAuto += Number(deal.value) || 0;
+    });
+
+    rows.forEach((row) => {
+      const targetRow = targetMap.get(row.key);
+      const manualValue = targetRow?.actual_amount;
+      row.actualSalesManual = manualValue === null || manualValue === undefined ? null : Number(manualValue) || 0;
+      row.actualSales = row.actualSalesManual !== null ? row.actualSalesManual : row.actualSalesAuto;
     });
 
     let cumulativeEstimated = 0;
@@ -433,7 +460,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       sixMonths: "6 meses",
       twelveMonths: "12 meses",
       saving: "Guardando...",
-      editableHint: "Corporate Target (HQ) y Expected Expenses se pueden editar aquí.",
+      editableHint: "Corporate Target (HQ) y Expected Expenses se pueden editar aquí. Actual Sales funciona en modo híbrido: toma automático desde deals ganados y permite override manual por mes.",
       refresh: "Refrescar",
       loading: "Cargando proyecciones...",
       noData: "No hay datos todavía.",
@@ -441,6 +468,8 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       weighted: "Weighted Pipeline",
       target: "Corporate Target (HQ)",
       actual: "Actual Sales",
+      actualAuto: "Actual Sales (Auto)",
+      actualManual: "Actual Sales (Manual Override)",
       expenses: "Expected Expenses",
       monthlyTable: "Tabla mensual (12 meses)",
       cumulative: "Comparative Cumulative",
@@ -473,7 +502,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       sixMonths: "6 months",
       twelveMonths: "12 months",
       saving: "Saving...",
-      editableHint: "Corporate Target (HQ) and Expected Expenses can be edited here.",
+      editableHint: "Corporate Target (HQ) and Expected Expenses can be edited here. Actual Sales runs in hybrid mode: auto from won deals with optional monthly manual override.",
       refresh: "Refresh",
       loading: "Loading projections...",
       noData: "No data yet.",
@@ -481,6 +510,8 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       weighted: "Weighted Pipeline",
       target: "Corporate Target (HQ)",
       actual: "Actual Sales",
+      actualAuto: "Actual Sales (Auto)",
+      actualManual: "Actual Sales (Manual Override)",
       expenses: "Expected Expenses",
       monthlyTable: "Monthly table (12 months)",
       cumulative: "Comparative Cumulative",
@@ -521,6 +552,8 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     weighted: "Weighted Pipeline",
     target: "Corporate Target (HQ)",
     actual: "Actual Sales",
+    actualAuto: "Actual Sales (Auto)",
+    actualManual: "Actual Sales (Manual Override)",
     expenses: "Expected Expenses",
     monthlyTable: "Monthly table",
     cumulative: "Comparative Cumulative",
@@ -624,7 +657,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead>
                     <tr style={{ background: "#f8fafc", color: "#334155" }}>
-                      {[copy.month, copy.estimated, copy.target, copy.actual, copy.expenses, copy.weighted].map((header) => (
+                      {[copy.month, copy.estimated, copy.target, copy.actual, copy.actualAuto, copy.expenses, copy.weighted].map((header) => (
                         <th key={header} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{header}</th>
                       ))}
                     </tr>
@@ -637,7 +670,20 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
                         <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
                           <MoneyInput value={row.corporateTarget} disabled={savingMonthKey === `${row.key}:budget_amount`} onCommit={(nextValue) => saveMonthlyField(row.key, 'budget_amount', nextValue)} />
                         </td>
-                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{fmtMoney(row.actualSales, currency)}</td>
+                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <MoneyInput
+                              value={row.actualSalesManual !== null ? row.actualSalesManual : ''}
+                              placeholder={String(Number(row.actualSalesAuto || 0))}
+                              disabled={savingMonthKey === `${row.key}:actual_amount`}
+                              onCommit={(nextValue) => saveMonthlyField(row.key, 'actual_amount', nextValue)}
+                            />
+                            <span style={{ fontSize: 10, color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}>
+                              {row.actualSalesManual !== null ? 'manual override activo' : `auto: ${fmtMoney(row.actualSalesAuto, currency)}`}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>{fmtMoney(row.actualSalesAuto, currency)}</td>
                         <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
                           <MoneyInput value={row.expectedExpenses} disabled={savingMonthKey === `${row.key}:expected_expense_amount`} onCommit={(nextValue) => saveMonthlyField(row.key, 'expected_expense_amount', nextValue)} />
                         </td>
@@ -649,6 +695,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
                       <td style={{ padding: "12px 14px" }}>{fmtMoney(model.totals.estimatedPipeline, currency)}</td>
                       <td style={{ padding: "12px 14px" }}>{fmtMoney(model.totals.corporateTarget, currency)}</td>
                       <td style={{ padding: "12px 14px" }}>{fmtMoney(model.totals.actualSales, currency)}</td>
+                      <td style={{ padding: "12px 14px" }}>{fmtMoney(model.rows.reduce((acc, row) => acc + (row.actualSalesAuto || 0), 0), currency)}</td>
                       <td style={{ padding: "12px 14px" }}>{fmtMoney(model.totals.expectedExpenses, currency)}</td>
                       <td style={{ padding: "12px 14px" }}>{fmtMoney(model.totals.weightedPipeline, currency)}</td>
                     </tr>
