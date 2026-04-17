@@ -47,7 +47,8 @@ function buildMonths() {
 
 function allocateDealValue(deal, projectionMode, customMonths, monthKeys) {
   const value = Number(deal.value) || 0;
-  const closeKey = monthKey(deal.closingDate || deal.closing_date || new Date().toISOString());
+  const effectiveClose = deal.wonAt || deal.won_at || deal.closingDate || deal.closing_date || new Date().toISOString();
+  const closeKey = monthKey(effectiveClose);
   const closeIndex = monthKeys.indexOf(closeKey);
   if (closeIndex === -1 || value <= 0) return Array(monthKeys.length).fill(0);
 
@@ -269,7 +270,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
           company: deal.company || deal.companyName || "",
           stage: deal.stage,
           value: Number(deal.value) || 0,
-          closingDate: deal.closingDate || deal.closing_date || "",
+          closingDate: (isWonStage(deal.stage, stages) ? (deal.wonAt || deal.won_at || deal.closingDate || deal.closing_date || "") : (deal.closingDate || deal.closing_date || "")),
           uiMode,
           revenueType: projection?.revenue_type || "singleuse",
         };
@@ -396,7 +397,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
 
     (deals || []).forEach((deal) => {
       if (!isWonStage(deal.stage, stages)) return;
-      const wonKey = monthKey(deal.closingDate || deal.closing_date || "");
+      const wonKey = monthKey(deal.wonAt || deal.won_at || deal.closingDate || deal.closing_date || "");
       const idx = keys.indexOf(wonKey);
       if (idx === -1) return;
       rows[idx].actualSalesAuto += Number(deal.value) || 0;

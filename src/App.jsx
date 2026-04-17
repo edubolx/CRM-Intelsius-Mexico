@@ -367,6 +367,7 @@ async function supabaseLoad() {
     const dls = (dls_raw || []).map(d => ({
       ...d,
       value: Number(d.value),
+      wonAt: d.won_at || null,
       meddicHistory: (evals || [])
         .filter(e => e.deal_id === d.id)
         .map(e => ({ id: e.id, date: e.date, meddic: e.meddic })),
@@ -1196,7 +1197,10 @@ function AppInner(){
     const base={meddicHistory:[],activities:[]};
     const row = f.id ? {...dls.find(d=>d.id===f.id), ...f} : {...base,...f,id:uid()};
     const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
+      const wonStageNow = stages.find((s) => s.name === row.stage)?.isWon || String(row.stage || '').toLowerCase().includes('ganado') || String(row.stage || '').toLowerCase().includes('won');
+      const existingDeal = dls.find(d => d.id === row.id);
+      const wonAt = wonStageNow ? (existingDeal?.wonAt || row.wonAt || new Date().toISOString()) : (existingDeal?.wonAt || row.wonAt || null);
+      const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, won_at: wonAt, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
       ensureSbOk(res, 'save deal');
     });
     if(!ok) return { ok:false, message: 'No se pudo guardar el deal' };
@@ -1208,18 +1212,21 @@ function AppInner(){
     if(!currentDeal || currentDeal.stage===stage) return true;
 
     const previousStage = currentDeal.stage;
+    const previousWonAt = currentDeal.wonAt || null;
+    const wonStageNow = stages.find((s) => s.name === stage)?.isWon || String(stage || '').toLowerCase().includes('ganado') || String(stage || '').toLowerCase().includes('won');
+    const nextWonAt = wonStageNow ? (currentDeal.wonAt || new Date().toISOString()) : currentDeal.wonAt;
 
-    setDls(p=>p.map(d=>d.id===id?{...d,stage}:d));
-    if(viewDeal?.id===id) setViewDeal(p=>p?{...p,stage}:p);
+    setDls(p=>p.map(d=>d.id===id?{...d,stage,wonAt:nextWonAt}:d));
+    if(viewDeal?.id===id) setViewDeal(p=>p?{...p,stage,wonAt:nextWonAt}:p);
 
     const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deals').update({ stage }).eq('id', id);
+      const res = await supabase.from('deals').update({ stage, won_at: nextWonAt }).eq('id', id);
       ensureSbOk(res, 'update deal stage');
     });
 
     if(!ok){
-      setDls(p=>p.map(d=>d.id===id?{...d,stage:previousStage}:d));
-      if(viewDeal?.id===id) setViewDeal(p=>p?{...p,stage:previousStage}:p);
+      setDls(p=>p.map(d=>d.id===id?{...d,stage:previousStage,wonAt:previousWonAt}:d));
+      if(viewDeal?.id===id) setViewDeal(p=>p?{...p,stage:previousStage,wonAt:previousWonAt}:p);
       return false;
     }
 
