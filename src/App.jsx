@@ -460,6 +460,9 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
             responsible: a.responsible || "",
             status: a.status || "pending",
             comment: a.comment || "",
+            importance_score: a.importanceScore ?? null,
+            urgency_score: a.urgencyScore ?? null,
+            eisenhower_score: a.eisenhowerScore ?? ((a.importanceScore != null && a.urgencyScore != null) ? Number(a.importanceScore || 0) + Number(a.urgencyScore || 0) : null),
             created_at: a.createdAt || null,
           }))
         );
