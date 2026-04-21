@@ -45,6 +45,9 @@ const T = {
     activityResponsible:"Responsable",
     activityStatus:"Estado",
     activityComment:"Comentario",
+    activityImportance:"Importancia",
+    activityUrgency:"Urgencia",
+    activityEisenhowerScore:"Score Eisenhower",
     addActivity:"Nueva actividad",
     activityEdit:"Editar actividad",
     activityUpdate:"Guardar cambios",
@@ -131,6 +134,9 @@ const T = {
     activityResponsible:"Owner",
     activityStatus:"Status",
     activityComment:"Comment",
+    activityImportance:"Importance",
+    activityUrgency:"Urgency",
+    activityEisenhowerScore:"Eisenhower Score",
     addActivity:"New activity",
     activityEdit:"Edit activity",
     activityUpdate:"Save changes",
@@ -381,6 +387,9 @@ async function supabaseLoad() {
           responsible: a.responsible,
           status: a.status,
           comment: a.comment || "",
+          importanceScore: a.importance_score ?? null,
+          urgencyScore: a.urgency_score ?? null,
+          eisenhowerScore: a.eisenhower_score ?? ((a.importance_score != null && a.urgency_score != null) ? Number(a.importance_score || 0) + Number(a.urgency_score || 0) : null),
           createdAt: a.created_at,
           updatedAt: a.updated_at,
         })),
@@ -1436,6 +1445,9 @@ function AppInner(){
         responsible: row.responsible || null,
         status: row.status || "pending",
         comment: row.comment || null,
+        importance_score: row.importanceScore,
+        urgency_score: row.urgencyScore,
+        eisenhower_score: row.eisenhowerScore,
       };
       const res = await supabase.from('deal_activities').insert([payload]);
       ensureSbOk(res, 'add deal activity');
@@ -1493,6 +1505,9 @@ function AppInner(){
         responsible: next.responsible || null,
         status: next.status || "pending",
         comment: next.comment || null,
+        importance_score: next.importanceScore,
+        urgency_score: next.urgencyScore,
+        eisenhower_score: next.eisenhowerScore,
       }).eq('id', activityId);
       ensureSbOk(res, 'update deal activity');
     });

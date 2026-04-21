@@ -29,7 +29,11 @@ export default function ActivitiesDashboard({ dls, t, onUpdateActivityStatus, on
   const completedWeek = base.filter((a) => a.status === "done" && [a.completedAt, a.updatedAt, a.createdAt, a.dueDate].some(inCurrentWeek));
 
   const lists = { all: base, pending, overdue, dueSoon, completedWeek };
-  const rows = lists[filter] || base;
+  const rows = (lists[filter] || base).slice().sort((a, b) => {
+    const scoreDiff = Number(b.eisenhowerScore ?? -1) - Number(a.eisenhowerScore ?? -1);
+    if (scoreDiff !== 0) return scoreDiff;
+    return (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31');
+  });
   const statusOpts = ACTIVITY_STATUSES.map((v) => ({ v, l: t[v] }));
 
   const cards = [
@@ -78,6 +82,9 @@ export default function ActivitiesDashboard({ dls, t, onUpdateActivityStatus, on
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
               {a.dueDate && <span style={{ fontSize: 10, color: "#475569", fontFamily: "'JetBrains Mono',monospace" }}>📅 {a.dueDate}</span>}
               {a.responsible && <span style={{ fontSize: 10, color: "#475569" }}>👤 {a.responsible}</span>}
+              {a.importanceScore != null && <span style={{ fontSize: 10, color: "#475569", fontFamily: "'JetBrains Mono',monospace" }}>Imp {a.importanceScore}</span>}
+              {a.urgencyScore != null && <span style={{ fontSize: 10, color: "#475569", fontFamily: "'JetBrains Mono',monospace" }}>Urg {a.urgencyScore}</span>}
+              {a.eisenhowerScore != null && <span style={{ fontSize: 10, color: "#003e7e", fontFamily: "'JetBrains Mono',monospace", background: "#eaf3ff", border: "1px solid #cbd5e1", borderRadius: 5, padding: "2px 6px" }}>Score {a.eisenhowerScore}</span>}
             </div>
             {a.comment && <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, lineHeight: 1.5 }}>{a.comment}</div>}
           </div>
