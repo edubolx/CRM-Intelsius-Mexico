@@ -68,25 +68,44 @@ export default function ActivitiesDashboard({ dls, t, onUpdateActivityStatus, on
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((a) => (
-          <div key={a.id} onClick={() => onOpenActivity(a.dealId)} style={{ background: "#ffffff", border: "1px solid #cfd8e3", borderRadius: 10, padding: "10px 12px", cursor: "pointer", boxShadow: '0 4px 12px rgba(15,23,42,.10)' }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", background: "#f5f7fa", border: "1px solid #cfd8e3", borderRadius: 5, padding: "2px 6px" }}>{t[a.type] || a.type}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{a.title}</span>
-                <span style={{ fontSize: 10, color: "#003e7e", fontFamily: "'JetBrains Mono',monospace", background: "#eaf3ff", border: "1px solid #cbd5e1", borderRadius: 5, padding: "2px 6px" }}>Deal: {a.dealName}</span>
+          <div key={a.id} onClick={() => onOpenActivity(a.dealId)} style={{ background: "#ffffff", border: "1px solid #cfd8e3", borderRadius: 10, padding: "12px 14px", cursor: "pointer", boxShadow: '0 4px 12px rgba(15,23,42,.10)' }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "start" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", background: "#f5f7fa", border: "1px solid #cfd8e3", borderRadius: 5, padding: "2px 6px" }}>{t[a.type] || a.type}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{a.title}</span>
+                  <span style={{ fontSize: 10, color: "#003e7e", fontFamily: "'JetBrains Mono',monospace", background: "#eaf3ff", border: "1px solid #cbd5e1", borderRadius: 5, padding: "2px 6px" }}>Deal: {a.dealName}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  {a.dueDate && <span style={{ fontSize: 10, color: "#475569", fontFamily: "'JetBrains Mono',monospace" }}>📅 {a.dueDate}</span>}
+                  {a.responsible && <span style={{ fontSize: 10, color: "#475569" }}>👤 {a.responsible}</span>}
+                </div>
+                {a.comment && <div style={{ fontSize: 11, color: "#64748b", marginTop: 6, lineHeight: 1.5 }}>{a.comment}</div>}
               </div>
-              <select value={a.status} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdateActivityStatus(a.dealId, a.id, e.target.value)} style={{ ...iSx, padding: "3px 6px", fontSize: 11, width: 140 }}>
-                {statusOpts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-              </select>
+
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8, minWidth: 190 }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ background: "#f8fafc", border: "1px solid #cfd8e3", borderRadius: 10, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: .8, fontFamily: "'JetBrains Mono',monospace", marginBottom: 6 }}>Eisenhower</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 6 }}>
+                    <div style={{ background: "#ffffff", border: "1px solid #dbe4ee", borderRadius: 8, padding: "6px 6px", textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: "#64748b", fontFamily: "'JetBrains Mono',monospace" }}>Imp</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{a.importanceScore ?? '—'}</div>
+                    </div>
+                    <div style={{ background: "#ffffff", border: "1px solid #dbe4ee", borderRadius: 8, padding: "6px 6px", textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: "#64748b", fontFamily: "'JetBrains Mono',monospace" }}>Urg</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{a.urgencyScore ?? '—'}</div>
+                    </div>
+                    <div style={{ background: "#eaf3ff", border: "1px solid #93c5fd", borderRadius: 8, padding: "6px 6px", textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: "#1d4ed8", fontFamily: "'JetBrains Mono',monospace" }}>Score</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: "#003e7e" }}>{a.eisenhowerScore ?? '—'}</div>
+                    </div>
+                  </div>
+                </div>
+                <select value={a.status} onChange={(e) => onUpdateActivityStatus(a.dealId, a.id, e.target.value)} style={{ ...iSx, padding: "3px 6px", fontSize: 11, width: "100%" }}>
+                  {statusOpts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              {a.dueDate && <span style={{ fontSize: 10, color: "#475569", fontFamily: "'JetBrains Mono',monospace" }}>📅 {a.dueDate}</span>}
-              {a.responsible && <span style={{ fontSize: 10, color: "#475569" }}>👤 {a.responsible}</span>}
-              {a.importanceScore != null && <span style={{ fontSize: 10, color: "#475569", fontFamily: "'JetBrains Mono',monospace" }}>Imp {a.importanceScore}</span>}
-              {a.urgencyScore != null && <span style={{ fontSize: 10, color: "#475569", fontFamily: "'JetBrains Mono',monospace" }}>Urg {a.urgencyScore}</span>}
-              {a.eisenhowerScore != null && <span style={{ fontSize: 10, color: "#003e7e", fontFamily: "'JetBrains Mono',monospace", background: "#eaf3ff", border: "1px solid #cbd5e1", borderRadius: 5, padding: "2px 6px" }}>Score {a.eisenhowerScore}</span>}
-            </div>
-            {a.comment && <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, lineHeight: 1.5 }}>{a.comment}</div>}
           </div>
         ))}
         {!rows.length && <div style={{ fontSize: 11, color: "#94a3b8" }}>{t.noActivities}</div>}
