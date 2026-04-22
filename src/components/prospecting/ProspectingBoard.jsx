@@ -224,6 +224,7 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {saveError && <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', borderRadius: 10, padding: '10px 12px', fontSize: 12 }}>{saveError}</div>}
+      {saving && <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', borderRadius: 10, padding: '10px 12px', fontSize: 12 }}>Guardando cambios en prospección…</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Btn ch={<><Ic n="plus" s={12} />Empresa</>} onClick={() => setModal({ type: 'company', data: {} })} disabled={saving} />

@@ -223,6 +223,12 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
   const [savingMonthKey, setSavingMonthKey] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  useEffect(() => {
+    if (!successMessage) return undefined;
+    const timer = setTimeout(() => setSuccessMessage(""), 1800);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
   const load = useCallback(async () => {
     if (!supabase) {
       setError(lang === "es" ? "Supabase no está configurado en este entorno." : "Supabase is not configured in this environment.");

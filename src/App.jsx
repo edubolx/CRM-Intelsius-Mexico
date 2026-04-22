@@ -1643,7 +1643,21 @@ function AppInner(){
                 <button key={l} onClick={()=>setLang(l)} style={{background:lang===l?"#003e7e":"transparent",color:lang===l?"#fff":"#64748b",border:"none",padding:"4px 13px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:.5,transition:"all .12s"}}>{l.toUpperCase()}</button>
               ))}
             </div>
-            <select value={currency} onChange={e=>setCurrency(e.target.value)}
+            <select value={currency} onChange={async e=>{
+              const nextCurrency = e.target.value;
+              setCurrency(nextCurrency);
+              try {
+                setSaveStatus('saving');
+                setSaveMessage('Guardando moneda');
+                await reloadFromSupabase();
+                setSaveStatus('saved');
+                setSaveMessage('Moneda actualizada');
+                setTimeout(()=>{ setSaveStatus('idle'); setSaveMessage(''); }, 1000);
+              } catch {
+                setSaveStatus('error');
+                setSaveMessage('No se pudo sincronizar la moneda');
+              }
+            }}
               title={t.currency}
               style={{background:"#f5f7fa",border:"1px solid #cbd5e1",borderRadius:7,padding:"4px 8px",color:"#0f172a",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
               {CURRENCIES.map(c=>(
