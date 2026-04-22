@@ -24,6 +24,8 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null);
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const statusLabel = useCallback((status) => {
     const found = PROSPECTING_STATUSES.find((s) => s.value === status);
@@ -79,6 +81,25 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
   const companyContacts = contacts.filter((c) => c.company_id === selectedCompanyId && !c.is_archived);
   const companyActivities = activities.filter((a) => a.company_id === selectedCompanyId);
 
+  const ensureOk = (result, op) => {
+    if (result?.error) throw new Error(result.error.message || op);
+    return result;
+  };
+
+  const guardedSave = async (fn) => {
+    setSaveError("");
+    setSaving(true);
+    try {
+      await fn();
+      return true;
+    } catch (e) {
+      setSaveError(e?.message || 'No se pudo guardar');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const upsertCompany = async (payload) => {
     const row = {
       id: payload.id || uid(),
@@ -94,8 +115,11 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
       updated_at: new Date().toISOString(),
     };
     if (!row.name) return;
-    await supabase.from('prospecting_companies').upsert([row], { onConflict: 'id' });
-    await loadProspecting();
+    const ok = await guardedSave(async () => {
+      ensureOk(await supabase.from('prospecting_companies').upsert([row], { onConflict: 'id' }), 'save prospecting company');
+      await loadProspecting();
+    });
+    if (!ok) return;
     setSelectedCompanyId(row.id);
     setModal(null);
   };
@@ -113,8 +137,11 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
       is_archived: false,
     };
     if (!row.company_id || !row.name) return;
-    await supabase.from('prospecting_contacts').upsert([row], { onConflict: 'id' });
-    await loadProspecting();
+    const ok = await guardedSave(async () => {
+      ensureOk(await supabase.from('prospecting_contacts').upsert([row], { onConflict: 'id' }), 'save prospecting contact');
+      await loadProspecting();
+    });
+    if (!ok) return;
     setModal(null);
   };
 
@@ -135,8 +162,11 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
       updated_at: new Date().toISOString(),
     };
     if (!row.company_id) return;
-    await supabase.from('prospecting_activities').upsert([row], { onConflict: 'id' });
-    await loadProspecting();
+    const ok = await guardedSave(async () => {
+      ensureOk(await supabase.from('prospecting_activities').upsert([row], { onConflict: 'id' }), 'save prospecting activity');
+      await loadProspecting();
+    });
+    if (!ok) return;
     setModal(null);
   };
 
@@ -145,10 +175,13 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
     const totalActivities = activities.filter((a) => a.company_id === companyId).length;
     const ok = window.confirm(`¿Borrar empresa y todo su historial de prospección?\n\nSe eliminarán ${totalContacts} contactos y ${totalActivities} actividades asociadas.`);
     if (!ok) return;
-    await supabase.from('prospecting_activities').delete().eq('company_id', companyId);
-    await supabase.from('prospecting_contacts').delete().eq('company_id', companyId);
-    await supabase.from('prospecting_companies').delete().eq('id', companyId);
-    await loadProspecting();
+    const saved = await guardedSave(async () => {
+      ensureOk(await supabase.from('prospecting_activities').delete().eq('company_id', companyId), 'delete prospecting activities');
+      ensureOk(await supabase.from('prospecting_contacts').delete().eq('company_id', companyId), 'delete prospecting contacts');
+      ensureOk(await supabase.from('prospecting_companies').delete().eq('id', companyId), 'delete prospecting company');
+      await loadProspecting();
+    });
+    if (!saved) return;
     if (selectedCompanyId === companyId) {
       const remaining = companies.filter((c) => c.id !== companyId);
       setSelectedCompanyId(remaining[0]?.id || '');
@@ -161,31 +194,40 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
     if (!ct) return;
     const ok = window.confirm(`¿Borrar contacto "${ct.name}"?`);
     if (!ok) return;
-    await supabase.from('prospecting_activities').update({ contact_id: null }).eq('contact_id', contactId);
-    await supabase.from('prospecting_contacts').delete().eq('id', contactId);
-    await loadProspecting();
+    const saved = await guardedSave(async () => {
+      ensureOk(await supabase.from('prospecting_activities').update({ contact_id: null }).eq('contact_id', contactId), 'unlink prospecting contact');
+      ensureOk(await supabase.from('prospecting_contacts').delete().eq('id', contactId), 'delete prospecting contact');
+      await loadProspecting();
+    });
+    if (!saved) return;
   };
 
   const deleteActivity = async (activityId) => {
     const ok = window.confirm('¿Borrar esta actividad de prospección?');
     if (!ok) return;
-    await supabase.from('prospecting_activities').delete().eq('id', activityId);
-    await loadProspecting();
+    const saved = await guardedSave(async () => {
+      ensureOk(await supabase.from('prospecting_activities').delete().eq('id', activityId), 'delete prospecting activity');
+      await loadProspecting();
+    });
+    if (!saved) return;
   };
 
   const updateProspectingActivityStatus = async (activityId, status) => {
-    await supabase.from('prospecting_activities').update({ status, updated_at: new Date().toISOString() }).eq('id', activityId);
-    await loadProspecting();
+    await guardedSave(async () => {
+      ensureOk(await supabase.from('prospecting_activities').update({ status, updated_at: new Date().toISOString() }).eq('id', activityId), 'update prospecting activity status');
+      await loadProspecting();
+    });
   };
 
   if (loading) return <div style={{ padding: 20, fontSize: 12, color: '#64748b' }}>Cargando prospección...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {saveError && <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', borderRadius: 10, padding: '10px 12px', fontSize: 12 }}>{saveError}</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Btn ch={<><Ic n="plus" s={12} />Empresa</>} onClick={() => setModal({ type: 'company', data: {} })} />
-          <Btn v="subtle" ch={<><Ic n="plus" s={12} />Actividad</>} onClick={() => setModal({ type: 'activity', data: { company_id: selectedCompanyId } })} disabled={!selectedCompanyId} />
+          <Btn ch={<><Ic n="plus" s={12} />Empresa</>} onClick={() => setModal({ type: 'company', data: {} })} disabled={saving} />
+          <Btn v="subtle" ch={<><Ic n="plus" s={12} />Actividad</>} onClick={() => setModal({ type: 'activity', data: { company_id: selectedCompanyId } })} disabled={!selectedCompanyId || saving} />
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input placeholder="Buscar empresa..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...iSx, width: 180, padding: '6px 10px' }} />
@@ -239,8 +281,8 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <Btn v="ghost" ch="Editar" onClick={() => setModal({ type: 'company', data: selectedCompany })} />
-                  <Btn v="subtle" ch="+ Contacto" onClick={() => setModal({ type: 'contact', data: { company_id: selectedCompany.id } })} />
+                  <Btn v="ghost" ch="Editar" onClick={() => setModal({ type: 'company', data: selectedCompany })} disabled={saving} />
+                  <Btn v="subtle" ch="+ Contacto" onClick={() => setModal({ type: 'contact', data: { company_id: selectedCompany.id } })} disabled={saving} />
                   <Btn v="ghost" ch={<><Ic n="trash" s={11} />Borrar</>} sx={{ color: '#ef4444', border: '1px solid #ef444455' }} onClick={() => deleteCompany(selectedCompany.id)} />
                 </div>
               </div>
@@ -253,7 +295,7 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
 
               {activeTab === 'timeline' && (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 390, overflowY: 'auto' }}>
-                  <Btn v="subtle" ch={<><Ic n="plus" s={12} />Nueva actividad</>} onClick={() => setModal({ type: 'activity', data: { company_id: selectedCompany.id } })} />
+                  <Btn v="subtle" ch={<><Ic n="plus" s={12} />Nueva actividad</>} onClick={() => setModal({ type: 'activity', data: { company_id: selectedCompany.id } })} disabled={saving} />
                   {companyActivities.map((a) => {
                     const ctc = contacts.find((c) => c.id === a.contact_id);
                     return (

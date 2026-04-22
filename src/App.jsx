@@ -1313,18 +1313,36 @@ function AppInner(){
       associatedContacts: assocCts.length,
       associatedDeals: assocDls.length,
       // Simple delete (no associated records)
-      onDelete: ()=>{
+      onDelete: async()=>{
+        const ok = await withSaveStatus(async()=>{
+          ensureSbOk(await supabase.from('companies').delete().eq('id', id), 'delete company');
+        });
+        if(!ok) return;
         setCos(p=>p.filter(c=>c.id!==id));
       },
       // Cascade: delete company + all associated contacts & deals
-      onCascadeDelete: ()=>{
+      onCascadeDelete: async()=>{
+        const ok = await withSaveStatus(async()=>{
+          ensureSbOk(await supabase.from('deal_activities').delete().in('deal_id', assocDls.map(d=>d.id)), 'delete activities by company cascade');
+          ensureSbOk(await supabase.from('meddic_evals').delete().in('deal_id', assocDls.map(d=>d.id)), 'delete meddic by company cascade');
+          ensureSbOk(await supabase.from('deals').delete().eq('company_id', id), 'delete deals by company cascade');
+          ensureSbOk(await supabase.from('contacts').delete().eq('company_id', id), 'delete contacts by company cascade');
+          ensureSbOk(await supabase.from('companies').delete().eq('id', id), 'delete company cascade');
+        });
+        if(!ok) return;
         setCos(p=>p.filter(c=>c.id!==id));
         setCts(p=>p.filter(c=>c.companyId!==id));
         setDls(p=>p.filter(d=>d.companyId!==id));
         if(viewDeal?.companyId===id) setViewDeal(null);
       },
       // Unlink: delete company, clear companyId on contacts & deals
-      onUnlinkDelete: ()=>{
+      onUnlinkDelete: async()=>{
+        const ok = await withSaveStatus(async()=>{
+          ensureSbOk(await supabase.from('contacts').update({ company_id:null }).eq('company_id', id), 'unlink contacts from company');
+          ensureSbOk(await supabase.from('deals').update({ company_id:null }).eq('company_id', id), 'unlink deals from company');
+          ensureSbOk(await supabase.from('companies').delete().eq('id', id), 'delete company after unlink');
+        });
+        if(!ok) return;
         setCos(p=>p.filter(c=>c.id!==id));
         setCts(p=>p.map(c=>c.companyId===id?{...c,companyId:""}:c));
         setDls(p=>p.map(d=>d.companyId===id?{...d,companyId:""}:d));
@@ -1340,7 +1358,12 @@ function AppInner(){
       type:"contact",
       name: ct.name,
       associatedDeals: assocDls.length,
-      onDelete: ()=>{
+      onDelete: async()=>{
+        const ok = await withSaveStatus(async()=>{
+          ensureSbOk(await supabase.from('deals').update({ contact_id:null }).eq('contact_id', id), 'unlink deals from contact');
+          ensureSbOk(await supabase.from('contacts').delete().eq('id', id), 'delete contact');
+        });
+        if(!ok) return;
         setCts(p=>p.filter(c=>c.id!==id));
         // Unlink deals that referenced this contact
         setDls(p=>p.map(d=>d.contactId===id?{...d,contactId:""}:d));
@@ -1371,10 +1394,14 @@ function AppInner(){
     });
   };
 
-  const requestDelUsr=(id)=>{
+  const requestDelUsr=async(id)=>{
     const u = users.find(x=>x.id===id);
     if(!u) return;
     if(window.confirm(`¿Eliminar usuario ${u.alias || u.name}?`)){
+      const ok = await withSaveStatus(async()=>{
+        ensureSbOk(await supabase.from('crm_users').delete().eq('id', id), 'delete user');
+      });
+      if(!ok) return;
       setUsers(p=>p.filter(x=>x.id!==id));
     }
   };
@@ -1530,8 +1557,28 @@ function AppInner(){
     setViewDeal({...d, _openTab:"activities"});
   };
 
-  const importCos=rows=>setCos(p=>{const ex=new Set(p.map(c=>c.name.toLowerCase()));return[...p,...rows.filter(r=>!ex.has(r.name.toLowerCase()))];});
-  const importCts=rows=>setCts(p=>{const ex=new Set(p.map(c=>c.email?.toLowerCase()).filter(Boolean));return[...p,...rows.filter(r=>!r.email||!ex.has(r.email.toLowerCase()))];});
+  const importCos=async(rows)=>{
+    const ex=new Set(cos.map(c=>String(c.name||'').toLowerCase()));
+    const deduped=rows.filter(r=>!ex.has(String(r.name||'').toLowerCase()));
+    if(!deduped.length) return true;
+    const ok = await withSaveStatus(async()=>{
+      const payload = deduped.map(r=>({ id:r.id||uid(), name:r.name, industry:r.industry||"", website:r.website||"", phone:r.phone||"", notes:r.notes||"" }));
+      const res = await supabase.from('companies').upsert(payload, { onConflict:'id' });
+      ensureSbOk(res, 'import companies');
+    });
+    return ok;
+  };
+  const importCts=async(rows)=>{
+    const ex=new Set(cts.map(c=>String(c.email||'').toLowerCase()).filter(Boolean));
+    const deduped=rows.filter(r=>!r.email||!ex.has(String(r.email||'').toLowerCase()));
+    if(!deduped.length) return true;
+    const ok = await withSaveStatus(async()=>{
+      const payload = deduped.map(r=>({ id:r.id||uid(), name:r.name, email:r.email||"", phone:r.phone||"", title_f:r.titleF||"", linkedin:r.linkedin||"", company_id:r.companyId||null, notes:r.notes||"" }));
+      const res = await supabase.from('contacts').upsert(payload, { onConflict:'id' });
+      ensureSbOk(res, 'import contacts');
+    });
+    return ok;
+  };
 
   // ── Memoized filters (must be before any early return) ──
   const ql=q.toLowerCase();
