@@ -1483,6 +1483,11 @@ function AppInner(){
       ensureSbOk(res, 'add deal activity');
     });
     if(!ok) return false;
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]), row]}:d));
+    setViewDeal(p=>{
+      if(!p || p.id!==dealId) return p;
+      return {...p,activities:[...(p.activities||[]), row]};
+    });
     return true;
   };
   const deleteActivity=async(dealId, activityId)=>{
@@ -1503,7 +1508,7 @@ function AppInner(){
     const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
     const completedAt = status === "done" ? ((current && current.completedAt) || nowIso) : null;
     const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deal_activities').update({ status }).eq('id', activityId);
+      const res = await supabase.from('deal_activities').update({ status, updated_at: nowIso }).eq('id', activityId);
       ensureSbOk(res, 'update deal activity status');
     });
     if(!ok) return false;
@@ -1526,7 +1531,10 @@ function AppInner(){
     const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
     if(!current) return false;
     const nowIso = new Date().toISOString();
-    const next = { ...current, ...patch, updatedAt: nowIso };
+    const completedAt = (patch.status || current.status) === "done"
+      ? (current.completedAt || nowIso)
+      : ((patch.status || current.status) === "done" ? nowIso : null);
+    const next = { ...current, ...patch, updatedAt: nowIso, completedAt };
     const ok = await withSaveStatus(async()=>{
       const res = await supabase.from('deal_activities').update({
         type: next.type,
@@ -1538,6 +1546,7 @@ function AppInner(){
         importance_score: next.importanceScore,
         urgency_score: next.urgencyScore,
         eisenhower_score: next.eisenhowerScore,
+        updated_at: nowIso,
       }).eq('id', activityId);
       ensureSbOk(res, 'update deal activity');
     });

@@ -171,10 +171,10 @@ function RevenueTypeSelect({ value, onChange, disabled, labels }) {
 }
 
 function MoneyInput({ value, onCommit, disabled, placeholder }) {
-  const [draft, setDraft] = useState(String(Number(value || 0)));
+  const [draft, setDraft] = useState(value === '' || value === null || value === undefined ? '' : String(Number(value || 0)));
 
   useEffect(() => {
-    setDraft(String(Number(value || 0)));
+    setDraft(value === '' || value === null || value === undefined ? '' : String(Number(value || 0)));
   }, [value]);
 
   return (
@@ -221,6 +221,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
   const [error, setError] = useState("");
   const [savingDealId, setSavingDealId] = useState("");
   const [savingMonthKey, setSavingMonthKey] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const load = useCallback(async () => {
     if (!supabase) {
@@ -289,17 +290,20 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
       : { deal_id: dealId, mode: "one_time", custom_months: null, revenue_type: current.revenue_type || "singleuse" };
 
     setSavingDealId(dealId);
-    setDealProjections((prev) => {
-      const others = (prev || []).filter((row) => row.deal_id !== dealId);
-      return [...others, payload];
-    });
-
+    setError("");
+    setSuccessMessage("");
     const { error: upsertError } = await supabase.from("deal_projections").upsert([payload], { onConflict: "deal_id" });
     setSavingDealId("");
     if (upsertError) {
       setError(upsertError.message || (lang === "es" ? "No se pudo guardar la proyección del deal." : "Could not save deal projection."));
       await load();
+      return;
     }
+    setDealProjections((prev) => {
+      const others = (prev || []).filter((row) => row.deal_id !== dealId);
+      return [...others, payload];
+    });
+    setSuccessMessage(lang === 'es' ? 'Proyección guardada.' : 'Projection saved.');
   }, [dealProjections, lang, load]);
 
   const saveRevenueType = useCallback(async (dealId, revenueType) => {
@@ -313,37 +317,27 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     };
 
     setSavingDealId(dealId);
-    setDealProjections((prev) => {
-      const others = (prev || []).filter((row) => row.deal_id !== dealId);
-      return [...others, payload];
-    });
-
+    setError("");
+    setSuccessMessage("");
     const { error: upsertError } = await supabase.from('deal_projections').upsert([payload], { onConflict: 'deal_id' });
     setSavingDealId("");
     if (upsertError) {
       setError(upsertError.message || (lang === 'es' ? 'No se pudo guardar el tipo de deal.' : 'Could not save deal type.'));
       await load();
+      return;
     }
+    setDealProjections((prev) => {
+      const others = (prev || []).filter((row) => row.deal_id !== dealId);
+      return [...others, payload];
+    });
+    setSuccessMessage(lang === 'es' ? 'Tipo de deal guardado.' : 'Deal type saved.');
   }, [dealProjections, lang, load]);
 
   const saveMonthlyField = useCallback(async (rowKey, field, nextValue) => {
     if (!supabase) return;
     setSavingMonthKey(`${rowKey}:${field}`);
-    setTargets((prev) => {
-      const existing = (prev || []).find((row) => monthKey(row.month_start) === rowKey);
-      if (existing) {
-        return (prev || []).map((row) => monthKey(row.month_start) === rowKey ? { ...row, [field]: nextValue } : row);
-      }
-      return [
-        ...(prev || []),
-        {
-          month_start: `${rowKey}-01`,
-          budget_amount: field === 'budget_amount' ? nextValue : 0,
-          actual_amount: 0,
-          expected_expense_amount: field === 'expected_expense_amount' ? nextValue : 0,
-        }
-      ];
-    });
+    setError("");
+    setSuccessMessage("");
 
     const existing = (targets || []).find((row) => monthKey(row.month_start) === rowKey);
     const payload = {
@@ -358,7 +352,17 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
     if (upsertError) {
       setError(upsertError.message || (lang === 'es' ? 'No se pudo guardar el valor mensual.' : 'Could not save monthly value.'));
       await load();
+      return;
     }
+    setTargets((prev) => {
+      const prevRows = prev || [];
+      const current = prevRows.find((row) => monthKey(row.month_start) === rowKey);
+      if (current) {
+        return prevRows.map((row) => monthKey(row.month_start) === rowKey ? { ...row, [field]: nextValue } : row);
+      }
+      return [...prevRows, payload];
+    });
+    setSuccessMessage(lang === 'es' ? 'Valor mensual guardado.' : 'Monthly value saved.');
   }, [lang, load, targets]);
 
   const model = useMemo(() => {
@@ -581,6 +585,7 @@ export default function ProjectionsView({ lang = "es", deals = [], stages = [], 
 
       {loading && <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 18, color: "#64748b" }}>{copy.loading}</div>}
       {!loading && error && <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 14, padding: 18, color: "#be123c" }}>{error}</div>}
+      {!loading && !error && successMessage && <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 14, padding: 14, color: "#047857", fontSize: 12 }}>{successMessage}</div>}
       {!loading && !error && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
