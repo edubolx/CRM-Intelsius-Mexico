@@ -1,3 +1,12 @@
+function dedupeById(items = []) {
+  const map = new Map();
+  items.forEach((item) => {
+    if (!item?.id) return;
+    map.set(item.id, item);
+  });
+  return Array.from(map.values());
+}
+
 export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
   if (!supabase) return null;
   try {
@@ -29,22 +38,24 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
       meddicHistory: (evals || [])
         .filter((e) => e.deal_id === d.id)
         .map((e) => ({ id: e.id, date: e.date, meddic: e.meddic })),
-      activities: (activities || [])
-        .filter((a) => a.deal_id === d.id)
-        .map((a) => ({
-          id: a.id,
-          type: a.type,
-          title: a.title,
-          dueDate: a.due_date,
-          responsible: a.responsible,
-          status: a.status,
-          comment: a.comment || "",
-          importanceScore: a.importance_score ?? null,
-          urgencyScore: a.urgency_score ?? null,
-          eisenhowerScore: a.eisenhower_score ?? ((a.importance_score != null && a.urgency_score != null) ? Number(a.importance_score || 0) + Number(a.urgency_score || 0) : null),
-          createdAt: a.created_at,
-          updatedAt: a.updated_at,
-        })),
+      activities: dedupeById(
+        (activities || [])
+          .filter((a) => a.deal_id === d.id)
+          .map((a) => ({
+            id: a.id,
+            type: a.type,
+            title: a.title,
+            dueDate: a.due_date,
+            responsible: a.responsible,
+            status: a.status,
+            comment: a.comment || "",
+            importanceScore: a.importance_score ?? null,
+            urgencyScore: a.urgency_score ?? null,
+            eisenhowerScore: a.eisenhower_score ?? ((a.importance_score != null && a.urgency_score != null) ? Number(a.importance_score || 0) + Number(a.urgency_score || 0) : null),
+            createdAt: a.created_at,
+            updatedAt: a.updated_at,
+          }))
+      ),
     }));
 
     const stages = stagesRaw && stagesRaw.length > 0

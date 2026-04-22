@@ -349,6 +349,14 @@ const PROSPECTING_ACTIVITY_STATUSES = [
 // ─── Storage helpers (Supabase with localStorage fallback) ────────────────────
 const STORAGE_KEY = "crm5_data";
 const uid = () => crypto.randomUUID();
+const dedupeById = (items=[]) => {
+  const map = new Map();
+  items.forEach((item) => {
+    if (!item?.id) return;
+    map.set(item.id, item);
+  });
+  return Array.from(map.values());
+};
 
 // ---- Supabase helpers ----
 async function supabaseLoad() {
@@ -1483,10 +1491,10 @@ function AppInner(){
       ensureSbOk(res, 'add deal activity');
     });
     if(!ok) return false;
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]), row]}:d));
+    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:dedupeById([...(d.activities||[]), row])}:d));
     setViewDeal(p=>{
       if(!p || p.id!==dealId) return p;
-      return {...p,activities:[...(p.activities||[]), row]};
+      return {...p,activities:dedupeById([...(p.activities||[]), row])};
     });
     return true;
   };
