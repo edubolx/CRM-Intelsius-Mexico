@@ -560,6 +560,7 @@ const Ic = ({n,s=15})=>{
     chevDown:<svg {...p} strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>,
     chevUp:<svg {...p} strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>,
     star:<svg {...p} fill="currentColor" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
+    chart:<svg {...p}><line x1="4" y1="20" x2="20" y2="20"/><line x1="7" y1="16" x2="7" y2="10"/><line x1="12" y1="16" x2="12" y2="6"/><line x1="17" y1="16" x2="17" y2="12"/></svg>,
     history:<svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
     meddic:<svg {...p}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
     arrowRight:<svg {...p} strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
