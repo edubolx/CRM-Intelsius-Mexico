@@ -1516,11 +1516,8 @@ function AppInner(){
     const nowIso = new Date().toISOString();
     const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
     const completedAt = status === "done" ? ((current && current.completedAt) || nowIso) : null;
-    const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deal_activities').update({ status, updated_at: nowIso }).eq('id', activityId);
-      ensureSbOk(res, 'update deal activity status');
-    });
-    if(!ok) return false;
+    const previousStatus = current?.status;
+
     setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>{
       if(a.id!==activityId) return a;
       return { ...a, status, completedAt, updatedAt: nowIso };
@@ -1533,6 +1530,23 @@ function AppInner(){
         return { ...a, status, completedAt, updatedAt: nowIso };
       })};
     });
+
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deal_activities').update({ status, updated_at: nowIso }).eq('id', activityId).select('id,status').single();
+      ensureSbOk(res, 'update deal activity status');
+      if(res.data?.status !== status) throw new Error('Status not confirmed by database');
+    });
+    if(!ok) {
+      setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?{...a,status:previousStatus ?? a.status,updatedAt:a.updatedAt}:a)}:d));
+      setViewDeal(p=>{
+        if(!p || p.id!==dealId) return p;
+        const currentActivities = Array.isArray(p.activities) ? p.activities : [];
+        return {...p,activities:currentActivities.map(a=>a.id===activityId?{...a,status:previousStatus ?? a.status,updatedAt:a.updatedAt}:a)};
+      });
+      await reloadFromSupabase();
+      return false;
+    }
+    await reloadFromSupabase();
     return true;
   };
 
