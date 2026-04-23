@@ -1532,7 +1532,7 @@ function AppInner(){
     });
 
     const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deal_activities').update({ status, updated_at: nowIso }).eq('id', activityId).select('id,status').single();
+      const res = await supabase.from('deal_activities').update({ status }).eq('id', activityId).select('id,status').single();
       ensureSbOk(res, 'update deal activity status');
       if(res.data?.status !== status) throw new Error('Status not confirmed by database');
     });
@@ -1569,7 +1569,6 @@ function AppInner(){
         importance_score: next.importanceScore,
         urgency_score: next.urgencyScore,
         eisenhower_score: next.eisenhowerScore,
-        updated_at: nowIso,
       }).eq('id', activityId);
       ensureSbOk(res, 'update deal activity');
     });
