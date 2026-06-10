@@ -5,6 +5,7 @@ export const initialDataState = {
   users: [],
   currency: "USD",
   stages: [],
+  journalEnabled: false,
 };
 
 export function crmReducer(state, action) {

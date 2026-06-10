@@ -1,5 +1,6 @@
 import { useState } from "react";
 import ActivitiesPanel from "../activities/ActivitiesPanel.jsx";
+import DealJournalPanel from "./DealJournalPanel.jsx";
 
 export default function DealDetailModal({
   deal,
@@ -17,6 +18,9 @@ export default function DealDetailModal({
   onUpdateActivityStatus,
   onUpdateActivity,
   onEditDeal,
+  onAddJournalEntry,
+  onDeleteJournalEntry,
+  journalEnabled,
   onClose,
   helpers,
 }) {
@@ -65,7 +69,12 @@ export default function DealDetailModal({
       </div>
 
       <div style={{ display: "flex", gap: 2, marginBottom: 18, borderBottom: "1px solid #cfd8e3" }}>
-        {[{ k: "meddic", l: "MEDDIC", icon: "meddic" }, { k: "notes", l: t.notes, icon: "edit" }, { k: "activities", l: t.activities, icon: "history" }].map((tb) => (
+        {[
+          { k: "meddic", l: "MEDDIC", icon: "meddic" },
+          { k: "notes", l: t.notes, icon: "edit" },
+          { k: "activities", l: t.activities, icon: "history" },
+          { k: "journal", l: t.journalTab, icon: "history" },
+        ].map((tb) => (
           <button key={tb.k} onClick={() => setTab(tb.k)} style={{ background: "none", border: "none", borderBottom: `2px solid ${tab === tb.k ? "#003e7e" : "transparent"}`, padding: "8px 14px", color: tab === tb.k ? "#27aae1" : "#64748b", fontFamily: "inherit", fontSize: 12, fontWeight: tab === tb.k ? 600 : 400, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
             <Ic n={tb.icon} s={12} />{tb.l}
             {tb.k === "meddic" && latestMeddic && (
@@ -91,6 +100,17 @@ export default function DealDetailModal({
           onUpdateActivityStatus={onUpdateActivityStatus}
           onUpdateActivity={onUpdateActivity}
           helpers={{ today, uid, ACTIVITY_TYPES, ACTIVITY_STATUSES, Sel, Inp, Txta, Btn, Ic, iSx }}
+        />
+      )}
+      {tab === "journal" && (
+        <DealJournalPanel
+          deal={deal}
+          t={t}
+          users={users}
+          journalEnabled={journalEnabled}
+          onAddManualEntry={onAddJournalEntry}
+          onDeleteManualEntry={onDeleteJournalEntry}
+          helpers={{ uid, Btn, Ic, Sel, Inp, Txta }}
         />
       )}
     </Modal>

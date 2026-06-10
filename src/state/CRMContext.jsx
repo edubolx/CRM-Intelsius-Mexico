@@ -34,6 +34,7 @@ export function CRMProvider({ children, sampleData, defaultStages }) {
         users: loaded.users || [],
         currency: loaded.currency || "USD",
         stages: loaded.stages || defaultStages,
+        journalEnabled: !!loaded.journalEnabled,
       },
     });
     if (saveStatus !== "saving") {
@@ -62,6 +63,7 @@ export function CRMProvider({ children, sampleData, defaultStages }) {
             users: loaded.users || [],
             currency: loaded.currency || "USD",
             stages: loaded.stages || defaultStages,
+            journalEnabled: !!loaded.journalEnabled,
           },
         });
         setLoading(false);
@@ -80,7 +82,7 @@ export function CRMProvider({ children, sampleData, defaultStages }) {
   useEffect(() => {
     if (!supabase) return;
 
-    const tables = ['deals', 'deal_activities', 'meddic_evals', 'companies', 'contacts', 'pipeline_stages', 'crm_users'];
+    const tables = ['deals', 'deal_activities', 'deal_journal_entries', 'meddic_evals', 'companies', 'contacts', 'pipeline_stages', 'crm_users'];
     const channels = tables.map((table) =>
       supabase
         .channel(`crm-realtime-${table}`)

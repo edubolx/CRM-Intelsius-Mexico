@@ -32,6 +32,15 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
       activities = data || [];
     } catch {}
 
+    let journalEntries = [];
+    let journalEnabled = false;
+    try {
+      const { data, error } = await supabase.from('deal_journal_entries').select('*').order('created_at');
+      if (error) throw error;
+      journalEntries = data || [];
+      journalEnabled = true;
+    } catch {}
+
     const dls = (dlsRaw || []).map((d) => ({
       ...d,
       value: Number(d.value),
@@ -56,6 +65,20 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
             updatedAt: a.updated_at,
           }))
       ),
+      journalEntries: dedupeById(
+        (journalEntries || [])
+          .filter((entry) => entry.deal_id === d.id)
+          .map((entry) => ({
+            id: entry.id,
+            source: entry.source,
+            kind: entry.entry_type,
+            title: entry.title || "",
+            content: entry.content || "",
+            author: entry.author || "",
+            meta: entry.meta || {},
+            createdAt: entry.created_at,
+          }))
+      ),
     }));
 
     const stages = stagesRaw && stagesRaw.length > 0
@@ -71,7 +94,7 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
         }))
       : null;
 
-    return { co: cos || [], ct: cts || [], dl: dls, stages, users: usersRaw || [] };
+    return { co: cos || [], ct: cts || [], dl: dls, stages, users: usersRaw || [], journalEnabled };
   } catch (err) {
     console.error('Supabase load error:', err);
     return null;
@@ -95,6 +118,7 @@ export async function storageGet({ supabase, SAMPLE_DATA, DEFAULT_STAGES }) {
       users: sbData.users || SAMPLE_DATA.users,
       currency: SAMPLE_DATA.currency || "USD",
       stages: sbData.stages || DEFAULT_STAGES,
+      journalEnabled: !!sbData.journalEnabled,
       __source: "supabase",
     };
   }
@@ -106,6 +130,7 @@ export async function storageGet({ supabase, SAMPLE_DATA, DEFAULT_STAGES }) {
     users: SAMPLE_DATA.users || [],
     currency: "USD",
     stages: DEFAULT_STAGES,
+    journalEnabled: false,
     __source: "empty",
   };
 }

@@ -39,6 +39,30 @@ const T = {
     viewDeal:"Ver deal",
     closeDeal:"Cerrar",
     activities:"Actividades",
+    journalTab:"Bitácora",
+    journalDealCreated:"Deal creado",
+    journalActivityPrefix:"Actividad",
+    journalStageChanged:"Cambio de stage",
+    journalManual:"Manual",
+    journalSystem:"Sistema",
+    journalEntryType:"Tipo de entrada",
+    journalNote:"Nota",
+    journalComment:"Comentario",
+    journalAuthor:"Autor",
+    journalWriteLabel:"Nota / comentario",
+    journalHint:"La bitácora manual se guarda aparte y no toca la lógica actual de actividades.",
+    journalUnavailable:"La tabla de bitácora aún no existe en Supabase. La vista sigue siendo segura, pero la captura manual quedará deshabilitada hasta aplicar la migración.",
+    journalAddEntry:"Agregar entrada",
+    journalSaveError:"No se pudo guardar la entrada en la bitácora.",
+    journalDeleteConfirm:"¿Seguro que quieres eliminar esta entrada manual?",
+    journalFilter:"Filtro",
+    journalFilter_all:"Todas",
+    journalFilter_system:"Sistema",
+    journalFilter_manual:"Manual",
+    journalFilter_activity:"Actividades",
+    journalFilter_stage:"Cambios de stage",
+    journalFilter_created:"Creación",
+    journalEmpty:"Sin entradas en la bitácora todavía.",
     activityType:"Tipo",
     activityTitle:"Título",
     activityDueDate:"Fecha compromiso",
@@ -128,6 +152,30 @@ const T = {
     viewDeal:"View deal",
     closeDeal:"Close",
     activities:"Activities",
+    journalTab:"Journal",
+    journalDealCreated:"Deal created",
+    journalActivityPrefix:"Activity",
+    journalStageChanged:"Stage change",
+    journalManual:"Manual",
+    journalSystem:"System",
+    journalEntryType:"Entry type",
+    journalNote:"Note",
+    journalComment:"Comment",
+    journalAuthor:"Author",
+    journalWriteLabel:"Note / comment",
+    journalHint:"Manual journal entries are stored separately and do not touch the current activities flow.",
+    journalUnavailable:"The journal table does not exist in Supabase yet. The view stays safe, but manual capture is disabled until the migration is applied.",
+    journalAddEntry:"Add entry",
+    journalSaveError:"Could not save the journal entry.",
+    journalDeleteConfirm:"Are you sure you want to delete this manual entry?",
+    journalFilter:"Filter",
+    journalFilter_all:"All",
+    journalFilter_system:"System",
+    journalFilter_manual:"Manual",
+    journalFilter_activity:"Activities",
+    journalFilter_stage:"Stage changes",
+    journalFilter_created:"Creation",
+    journalEmpty:"No journal entries yet.",
     activityType:"Type",
     activityTitle:"Title",
     activityDueDate:"Due date",
@@ -1136,7 +1184,7 @@ function BulkBar({type,t,data,cos,onImportCo,onImportCt}){const[open,setOpen]=us
 
 // ─── App Inner (consumes CRM context) ─────────────────────────────────────────
 function AppInner(){
-  const { cos, cts, dls, users, currency, stages, loading, saveStatus, saveMessage, setSaveStatus, setSaveMessage, setCos, setCts, setDls, setUsers, setCurrency, setStages, reloadFromSupabase } = useCRM();
+  const { cos, cts, dls, users, currency, stages, journalEnabled, loading, saveStatus, saveMessage, setSaveStatus, setSaveMessage, setCos, setCts, setDls, setUsers, setCurrency, setStages, reloadFromSupabase } = useCRM();
   const[lang,setLang]=useState("es");
   const t=T[lang];
   const[tab,setTab]=useState("deals");
@@ -1215,16 +1263,20 @@ function AppInner(){
   };
 
   const saveDl=async f=>{
-    const base={meddicHistory:[],activities:[]};
+    const base={meddicHistory:[],activities:[],journalEntries:[]};
     const row = f.id ? {...dls.find(d=>d.id===f.id), ...f} : {...base,...f,id:uid()};
+    const existingDeal = dls.find(d => d.id === row.id);
+    const previousStage = existingDeal?.stage || null;
     const ok = await withSaveStatus(async()=>{
       const wonStageNow = stages.find((s) => s.name === row.stage)?.isWon || String(row.stage || '').toLowerCase().includes('ganado') || String(row.stage || '').toLowerCase().includes('won');
-      const existingDeal = dls.find(d => d.id === row.id);
       const wonAt = wonStageNow ? (existingDeal?.wonAt || row.wonAt || new Date().toISOString()) : (existingDeal?.wonAt || row.wonAt || null);
       const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, won_at: wonAt, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
       ensureSbOk(res, 'save deal');
     });
     if(!ok) return { ok:false, message: 'No se pudo guardar el deal' };
+    if(previousStage && previousStage !== row.stage) {
+      await logStageChange(row.id, previousStage, row.stage);
+    }
     if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
     return { ok:true, id: row.id };
   };
@@ -1251,6 +1303,7 @@ function AppInner(){
       return false;
     }
 
+    await logStageChange(id, previousStage, stage);
     return true;
   };
 
@@ -1582,6 +1635,93 @@ function AppInner(){
     return true;
   };
 
+  const addDealJournalEntryLocal = (dealId, entry) => {
+    setDls(p=>p.map(d=>d.id===dealId?{...d,journalEntries:dedupeById([...(d.journalEntries||[]), entry])}:d));
+    setViewDeal(p=>{
+      if(!p || p.id!==dealId) return p;
+      return {...p,journalEntries:dedupeById([...(p.journalEntries||[]), entry])};
+    });
+  };
+
+  const removeDealJournalEntryLocal = (dealId, entryId) => {
+    setDls(p=>p.map(d=>d.id===dealId?{...d,journalEntries:(d.journalEntries||[]).filter(entry=>entry.id!==entryId)}:d));
+    setViewDeal(p=>{
+      if(!p || p.id!==dealId) return p;
+      return {...p,journalEntries:(p.journalEntries||[]).filter(entry=>entry.id!==entryId)};
+    });
+  };
+
+  const addManualJournalEntry=async(dealId, entry)=>{
+    if(!journalEnabled) return false;
+    const row = {
+      id: entry.id || uid(),
+      source: 'manual',
+      kind: entry.kind || 'note',
+      title: '',
+      content: entry.content || '',
+      author: entry.author || '',
+      meta: {},
+      createdAt: new Date().toISOString(),
+    };
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deal_journal_entries').insert([{
+        id: row.id,
+        deal_id: dealId,
+        source: row.source,
+        entry_type: row.kind,
+        title: row.title,
+        content: row.content,
+        author: row.author,
+        meta: row.meta,
+      }]);
+      ensureSbOk(res, 'add deal journal entry');
+    });
+    if(!ok) return false;
+    addDealJournalEntryLocal(dealId, row);
+    return true;
+  };
+
+  const deleteManualJournalEntry=async(dealId, entryId)=>{
+    if(!journalEnabled) return false;
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deal_journal_entries').delete().eq('id', entryId).eq('source', 'manual');
+      ensureSbOk(res, 'delete deal journal entry');
+    });
+    if(!ok) return false;
+    removeDealJournalEntryLocal(dealId, entryId);
+    return true;
+  };
+
+  const logStageChange=async(dealId, fromStage, toStage)=>{
+    if(!journalEnabled || !fromStage || !toStage || fromStage===toStage) return true;
+    const row = {
+      id: uid(),
+      source: 'system',
+      kind: 'stage',
+      title: '',
+      content: '',
+      author: '',
+      meta: { fromStage, toStage },
+      createdAt: new Date().toISOString(),
+    };
+    const ok = await withSaveStatus(async()=>{
+      const res = await supabase.from('deal_journal_entries').insert([{
+        id: row.id,
+        deal_id: dealId,
+        source: row.source,
+        entry_type: row.kind,
+        title: row.title,
+        content: row.content,
+        author: row.author,
+        meta: row.meta,
+      }]);
+      ensureSbOk(res, 'log deal stage change');
+    });
+    if(!ok) return false;
+    addDealJournalEntryLocal(dealId, row);
+    return true;
+  };
+
   const openDealActivities=(dealId)=>{
     const d = dls.find(x=>x.id===dealId);
     if(!d) return;
@@ -1808,6 +1948,9 @@ function AppInner(){
           onUpdateActivityStatus={(activityId,status)=>updateActivityStatus(viewDeal.id,activityId,status)}
           onUpdateActivity={(activityId,patch)=>updateActivity(viewDeal.id,activityId,patch)}
           onEditDeal={()=>{setModal({type:"deal",data:(dls.find(x=>x.id===viewDeal.id) || viewDeal)});setViewDeal(null);}}
+          onAddJournalEntry={(entry)=>addManualJournalEntry(viewDeal.id, entry)}
+          onDeleteJournalEntry={(entryId)=>deleteManualJournalEntry(viewDeal.id, entryId)}
+          journalEnabled={journalEnabled}
           onClose={()=>setViewDeal(null)}
           helpers={{ stageStyle, calcTotal, scoreColor, fv, Modal, Btn, Ic, MeddicPanel, today, uid, ACTIVITY_TYPES, ACTIVITY_STATUSES, Sel, Inp, Txta, iSx }}
         />

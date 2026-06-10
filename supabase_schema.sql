@@ -118,6 +118,29 @@ end $$;
 create index if not exists idx_deal_activities_deal on deal_activities(deal_id);
 create index if not exists idx_deal_activities_due  on deal_activities(due_date);
 
+-- 6b. Deal journal / logbook
+create table if not exists deal_journal_entries (
+  id         text primary key default gen_random_uuid()::text,
+  deal_id    text not null references deals(id) on delete cascade,
+  source     text not null default 'manual',
+  entry_type text not null default 'note',
+  title      text,
+  content    text,
+  author     text,
+  meta       jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table deal_journal_entries enable row level security;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='deal_journal_entries' and policyname='allow_all_deal_journal_entries') then
+    create policy "allow_all_deal_journal_entries" on deal_journal_entries for all using (true) with check (true);
+  end if;
+end $$;
+
+create index if not exists idx_deal_journal_entries_deal on deal_journal_entries(deal_id);
+create index if not exists idx_deal_journal_entries_created on deal_journal_entries(created_at);
+
 -- 7. Users for task assignment
 create table if not exists crm_users (
   id         text primary key default gen_random_uuid()::text,
