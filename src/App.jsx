@@ -396,6 +396,12 @@ const PROSPECTING_ACTIVITY_STATUSES = [
   { value:"bloqueada", label:{ es:"Bloqueada", en:"Blocked" } },
 ];
 
+const USA_HANDOVER_SOURCE = "USA Handover - Michael";
+const USA_STAGE_PREFIX = "USA Handover | ";
+const isUsaStageName = (name = "") => String(name || "").startsWith(USA_STAGE_PREFIX);
+const stripUsaStagePrefix = (name = "") => String(name || "").replace(USA_STAGE_PREFIX, "");
+const isUsaHandoverDeal = (deal = {}) => deal.pipelineType === "usa_handover" || deal.leadSourceCustom === USA_HANDOVER_SOURCE || isUsaStageName(deal.stage);
+
 // ─── Storage helpers (Supabase with localStorage fallback) ────────────────────
 const STORAGE_KEY = "crm5_data";
 const uid = () => crypto.randomUUID();
@@ -1270,9 +1276,11 @@ function AppInner(){
     const existingDeal = dls.find(d => d.id === row.id);
     const previousStage = existingDeal?.stage || null;
     const ok = await withSaveStatus(async()=>{
-      const wonStageNow = stages.find((s) => s.name === row.stage)?.isWon || String(row.stage || '').toLowerCase().includes('ganado') || String(row.stage || '').toLowerCase().includes('won');
+      const wonStageNow = activeStages.find((s) => s.name === row.stage)?.isWon || String(row.stage || '').toLowerCase().includes('ganado') || String(row.stage || '').toLowerCase().includes('won');
       const wonAt = wonStageNow ? (existingDeal?.wonAt || row.wonAt || new Date().toISOString()) : (existingDeal?.wonAt || row.wonAt || null);
-      const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, won_at: wonAt, notes:row.notes||"", lead_source:row.leadSource||null, lead_source_custom:row.leadSourceCustom||null }], { onConflict:'id' });
+      const effectiveLeadSource = row.pipelineType === 'usa_handover' || activePipelineType === 'usa_handover' ? 'Custom' : (row.leadSource || null);
+      const effectiveLeadSourceCustom = row.pipelineType === 'usa_handover' || activePipelineType === 'usa_handover' ? USA_HANDOVER_SOURCE : (row.leadSourceCustom || null);
+      const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, won_at: wonAt, notes:row.notes||"", lead_source:effectiveLeadSource, lead_source_custom:effectiveLeadSourceCustom }], { onConflict:'id' });
       ensureSbOk(res, 'save deal');
     });
     if(!ok) return { ok:false, message: 'No se pudo guardar el deal' };
@@ -1288,7 +1296,8 @@ function AppInner(){
 
     const previousStage = currentDeal.stage;
     const previousWonAt = currentDeal.wonAt || null;
-    const wonStageNow = stages.find((s) => s.name === stage)?.isWon || String(stage || '').toLowerCase().includes('ganado') || String(stage || '').toLowerCase().includes('won');
+    const stageSetForDeal = isUsaHandoverDeal(currentDeal) ? usaStages : mexicoStages;
+    const wonStageNow = stageSetForDeal.find((s) => s.name === stage)?.isWon || String(stage || '').toLowerCase().includes('ganado') || String(stage || '').toLowerCase().includes('won');
     const nextWonAt = wonStageNow ? (currentDeal.wonAt || new Date().toISOString()) : currentDeal.wonAt;
 
     setDls(p=>p.map(d=>d.id===id?{...d,stage,wonAt:nextWonAt}:d));
@@ -1341,9 +1350,13 @@ function AppInner(){
       }));
       ensureSbOk(await supabase.from('pipeline_stages').upsert(stageRows, { onConflict:'id' }), 'save pipeline stages');
 
-      const existingIdsRes = await supabase.from('pipeline_stages').select('id');
+      const existingIdsRes = await supabase.from('pipeline_stages').select('id,name');
       ensureSbOk(existingIdsRes, 'load existing pipeline stages');
-      const staleStageIds = (existingIdsRes.data || []).map(s => s.id).filter(id => !new Set(nextStages.map(s => s.id)).has(id));
+      const nextStageIds = new Set(nextStages.map(s => s.id));
+      const staleStageIds = (existingIdsRes.data || [])
+        .filter(s => activePipelineType === 'usa_handover' ? isUsaStageName(s.name) : !isUsaStageName(s.name))
+        .map(s => s.id)
+        .filter(id => !nextStageIds.has(id));
       if (staleStageIds.length > 0) {
         ensureSbOk(await supabase.from('pipeline_stages').delete().in('id', staleStageIds), 'delete stale pipeline stages');
       }
@@ -1755,14 +1768,20 @@ function AppInner(){
 
   // ── Memoized filters (must be before any early return) ──
   const ql=q.toLowerCase();
+  const activePipelineType = tab === "usa" ? "usa_handover" : "mexico";
+  const activePipelineSource = activePipelineType === "usa_handover" ? USA_HANDOVER_SOURCE : null;
+  const mexicoStages = useMemo(() => stages.filter(s => !isUsaStageName(s.name)), [stages]);
+  const usaStages = useMemo(() => stages.filter(s => isUsaStageName(s.name)).map(s => ({ ...s, label: stripUsaStagePrefix(s.name) })), [stages]);
+  const activeStages = activePipelineType === "usa_handover" ? usaStages : mexicoStages;
   const fCo=useMemo(()=>cos.filter(c=>c.name.toLowerCase().includes(ql)||c.industry?.toLowerCase().includes(ql)),[cos,ql]);
   const fCt=useMemo(()=>cts.filter(c=>c.name.toLowerCase().includes(ql)||c.email?.toLowerCase().includes(ql)),[cts,ql]);
-  const fDl=useMemo(()=>dls.filter(d=>d.name.toLowerCase().includes(ql)),[dls,ql]);
+  const fDl=useMemo(()=>dls.filter(d=>!isUsaHandoverDeal(d) && d.name.toLowerCase().includes(ql)),[dls,ql]);
+  const fUsaDl=useMemo(()=>dls.filter(d=>isUsaHandoverDeal(d) && d.name.toLowerCase().includes(ql)),[dls,ql]);
   const fUs=useMemo(()=>users.filter(u=>u.name.toLowerCase().includes(ql)||u.alias?.toLowerCase().includes(ql)||u.email?.toLowerCase().includes(ql)),[users,ql]);
 
-  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"projections",l:t.projections,i:"chart"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
-  const addL=tab==="deals"?t.newDeal:tab==="companies"?t.newCompany:tab==="contacts"?t.newContact:tab==="users"?t.newUser:null;
-  const addT=tab==="deals"?"deal":tab==="companies"?"company":tab==="contacts"?"contact":tab==="users"?"user":null;
+  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"usa",l:"USA Handover",i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"projections",l:t.projections,i:"chart"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
+  const addL=(tab==="deals"||tab==="usa")?t.newDeal:tab==="companies"?t.newCompany:tab==="contacts"?t.newContact:tab==="users"?t.newUser:null;
+  const addT=(tab==="deals"||tab==="usa")?"deal":tab==="companies"?"company":tab==="contacts"?"contact":tab==="users"?"user":null;
 
   // ── Show loading screen while data loads ──
   if(loading) return <LoadingScreen lang={lang}/>;
@@ -1825,7 +1844,7 @@ function AppInner(){
               <input value={q} onChange={e=>setQ(e.target.value)} placeholder={t.search}
                 style={{background:"#ffffff",border:"1px solid #cbd5e1",borderRadius:7,padding:"6px 11px 6px 27px",color:"#0f172a",fontSize:12,fontFamily:"inherit",outline:"none",width:160}}/>
             </div>
-            {addT && <Btn ch={<><Ic n="plus" s={12}/>{addL}</>} onClick={()=>setModal({type:addT,data:{}})} sx={{padding:"6px 14px"}}/>}
+            {addT && <Btn ch={<><Ic n="plus" s={12}/>{addL}</>} onClick={()=>setModal({type:addT,data:addT==="deal"?{pipelineType:activePipelineType,leadSource:activePipelineType==="usa_handover"?"Custom":"",leadSourceCustom:activePipelineSource||"",stage:activeStages[0]?.name||""}:{}})} sx={{padding:"6px 14px"}}/>}
           </div>
         </header>
 
@@ -1845,7 +1864,7 @@ function AppInner(){
                 <button key={o.k} onClick={()=>setPipelineFontSize(o.k)} style={{background:pipelineFontSize===o.k?"#003e7e":"transparent",color:pipelineFontSize===o.k?"#fff":"#64748b",border:"none",padding:"4px 10px",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}}>{o.l}</button>
               ))}
             </div>
-            {tab==="deals" && <Btn v="subtle" ch={<><Ic n="edit" s={12}/>{t.pipelineEditor}</>} onClick={()=>setPipelineEditorOpen(true)} sx={{fontSize:11,padding:"5px 12px"}}/>}
+            {(tab==="deals"||tab==="usa") && <Btn v="subtle" ch={<><Ic n="edit" s={12}/>{t.pipelineEditor}</>} onClick={()=>setPipelineEditorOpen(true)} sx={{fontSize:11,padding:"5px 12px"}}/>}
           </div>
           {(tab==="companies"||tab==="contacts")&&(
             <div style={{padding:"6px 0"}}>
@@ -1858,14 +1877,14 @@ function AppInner(){
 
         {/* Content */}
         <main style={{padding:18,zoom:uiZoom}}>
-          {tab==="deals"&&(
+          {(tab==="deals"||tab==="usa")&&(
             <Kanban
-              deals={fDl}
+              deals={tab==="usa"?fUsaDl:fDl}
               cos={cos}
               cts={cts}
               t={t}
               currency={currency}
-              stages={stages}
+              stages={activeStages}
               onEdit={d=>setModal({type:"deal",data:d})}
               onDel={requestDelDl}
               onStage={chStage}
@@ -1902,7 +1921,7 @@ function AppInner(){
             <ProjectionsView
               lang={lang}
               deals={dls}
-              stages={stages}
+              stages={mexicoStages}
               currency={currency}
             />
           )}
@@ -1942,7 +1961,7 @@ function AppInner(){
       {viewDeal&&(
         <DealDetailModal
           deal={(dls.find(x=>x.id===viewDeal.id) || viewDeal)}
-          cos={cos} cts={cts} users={users} lang={lang} currency={currency} stages={stages} t={t}
+          cos={cos} cts={cts} users={users} lang={lang} currency={currency} stages={isUsaHandoverDeal(viewDeal)?usaStages:mexicoStages} t={t}
           onSaveEval={ev=>saveEval(viewDeal.id,ev)}
           onDeleteEval={evalId=>deleteEval(viewDeal.id,evalId)}
           onAddActivity={activity=>addActivity(viewDeal.id,activity)}
@@ -1961,14 +1980,14 @@ function AppInner(){
       {modal?.type==="company"&&<Modal title={modal.data.id?t.editCompany:t.newCompanyTitle} onClose={()=>setModal(null)}><CoForm init={modal.data} t={t} onSave={saveCo} onClose={()=>setModal(null)}/></Modal>}
       {modal?.type==="contact"&&<Modal title={modal.data.id?t.editContact:t.newContactTitle} onClose={()=>setModal(null)}><CtForm init={modal.data} cos={cos} t={t} onSave={saveCt} onClose={()=>setModal(null)}/></Modal>}
       {modal?.type==="user"&&<Modal title={modal.data.id?t.editUser:t.newUserTitle} onClose={()=>setModal(null)}><UsrForm init={modal.data} t={t} onSave={saveUsr} onClose={()=>setModal(null)}/></Modal>}
-      {modal?.type==="deal"&&<Modal title={modal.data.id?t.editDeal:t.newDealTitle} onClose={()=>setModal(null)}><DlForm init={modal.data} cos={cos} cts={cts} t={t} lang={lang} currency={currency} stages={stages} onSave={saveDl} onClose={()=>setModal(null)}/></Modal>}
+      {modal?.type==="deal"&&<Modal title={modal.data.id?t.editDeal:t.newDealTitle} onClose={()=>setModal(null)}><DlForm init={modal.data} cos={cos} cts={cts} t={t} lang={lang} currency={currency} stages={activeStages} onSave={saveDl} onClose={()=>setModal(null)}/></Modal>}
 
       {/* Confirm Delete Dialog */}
       <ConfirmDeleteModal config={confirmDel} t={t} onClose={()=>setConfirmDel(null)}/>
 
       {/* Pipeline Editor */}
       {pipelineEditorOpen&&(
-        <PipelineEditor stages={stages} dls={dls} t={t}
+        <PipelineEditor stages={activeStages} dls={activePipelineType==="usa_handover"?fUsaDl:fDl} t={t}
           onSave={savePipelineStages} onClose={()=>setPipelineEditorOpen(false)}/>
       )}
     </>

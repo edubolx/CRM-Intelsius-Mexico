@@ -45,7 +45,7 @@ export default function ProspectingBoard({ lang, users = [], helpers, forms }) {
     }
     try {
       const [{ data: co }, { data: ct }, { data: ac }] = await Promise.all([
-        supabase.from('prospecting_companies').select('*').order('updated_at', { ascending: false }),
+        supabase.from('prospecting_companies').select('*').neq('lead_source', 'USA Handover - Michael').order('updated_at', { ascending: false }),
         supabase.from('prospecting_contacts').select('*').order('created_at', { ascending: false }),
         supabase.from('prospecting_activities').select('*').order('activity_at', { ascending: false }),
       ]);

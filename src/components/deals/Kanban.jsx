@@ -94,6 +94,7 @@ const Kanban = memo(function Kanban({ deals, cos, cts, t, currency, stages, onEd
         {stages.map((stg) => {
           const m = stg;
           const stage = stg.name;
+          const stageLabel = stg.label || stg.name;
           const isCompact = isCompactFinalStage(stage);
           const expanded = !!expandedStages[stg.id];
           const colRaw = deals.filter((d) => d.stage === stage);
@@ -121,7 +122,7 @@ const Kanban = memo(function Kanban({ deals, cos, cts, t, currency, stages, onEd
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7, paddingBottom: 7, borderBottom: `1px solid ${m.border}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
                   <span style={{ fontSize: 12 }}>{m.emoji}</span>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: m.accent, fontFamily: "'JetBrains Mono',monospace", letterSpacing: .2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{stage}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: m.accent, fontFamily: "'JetBrains Mono',monospace", letterSpacing: .2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{stageLabel}</span>
                 </div>
                 <span style={{ fontSize: 10, color: "#64748b", background: "#f5f7fa", borderRadius: 4, padding: "1px 5px", fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>{col.length}</span>
               </div>
