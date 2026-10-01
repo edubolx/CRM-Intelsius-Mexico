@@ -21,14 +21,14 @@ const inputStyle = { width: "100%", background: "transparent", border: "1px soli
 const filterStyle = { width: "100%", background: "#f8fafc", border: "1px solid #cfd8e3", borderRadius: 10, padding: "8px 11px", color: "#0f172a", fontSize: 13, fontFamily: "inherit", outline: "none" };
 const uid = () => crypto.randomUUID();
 const score = (task) => Number(task.importanceScore || 0) + Number(task.urgencyScore || 0);
-const isHigh = (value) => Number(value || 0) >= 4;
+const isHigh = (value) => Number(value || 0) >= 4; // 1–3 = bajo/medio, 4–5 = alto
 const quadrantFor = (task) => {
-  const important = isHigh(task.importanceScore);
-  const urgent = isHigh(task.urgencyScore);
-  if (important && urgent) return "doNow";
-  if (important && !urgent) return "schedule";
-  if (!important && urgent) return "delegate";
-  return "backlog";
+  const highImportance = isHigh(task.importanceScore);
+  const highUrgency = isHigh(task.urgencyScore);
+  if (highImportance && highUrgency) return "doNow";      // importante + urgente
+  if (highImportance && !highUrgency) return "schedule";   // importante + no urgente
+  if (!highImportance && highUrgency) return "delegate";   // no tan importante + urgente
+  return "backlog";                                        // no tan importante + no urgente
 };
 const statusLabel = (value) => STATUSES.find((s) => s.value === value)?.label || value;
 const newTask = () => ({
@@ -186,7 +186,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>Tareas especiales</h2>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Grid editable directo: escribe en la celda y se guarda al salir o cambiar select.</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Grid editable directo. Escala: 1 bajo · 5 alto. Do now = alta importancia + alta urgencia.</div>
         </div>
         <button onClick={addInlineRow} style={{ background: "#003e7e", color: "#fff", border: "1px solid #003e7e", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontWeight: 600 }}>+ Nueva fila</button>
       </div>
@@ -212,8 +212,8 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
             <div style={{ fontSize: 11, color: "#64748b" }}>Tip: crea una fila, escribe el título y sal de la celda para guardar.</div>
           </div>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1320, fontSize: 12 }}>
-              <thead><tr style={{ background: "#f8fafc", color: "#475569" }}>{["Tarea", "Descripción", "Responsable", "Imp.", "Urg.", "Score", "Cuadrante", "Estado", "Fecha límite", "Deal", "Comentarios", "Sync", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1560, fontSize: 12 }}>
+              <thead><tr style={{ background: "#f8fafc", color: "#475569" }}>{["Tarea", "Descripción amplia", "Responsable", "Imp. (5 alto)", "Urg. (5 alto)", "Score", "Cuadrante", "Estado", "Fecha límite", "Deal", "Comentarios", "Sync", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
               <tbody>
                 {filteredTasks.map((task) => {
                   const q = QUADRANTS.find((x) => x.key === quadrantFor(task));
@@ -222,7 +222,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                   return (
                     <tr key={task.id} style={{ background: task.isNew ? "#f8fafc" : "#fff" }}>
                       <EditableCell w={210}><input value={task.title} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700 }} /></EditableCell>
-                      <EditableCell w={260}><textarea value={task.description || ""} onChange={(e) => updateLocal(task.id, { description: e.target.value })} onBlur={(e) => patchAndSave(task.id, { description: e.target.value })} rows={2} style={{ ...cellInput, resize: "vertical" }} /></EditableCell>
+                      <EditableCell w={430}><textarea value={task.description || ""} onChange={(e) => updateLocal(task.id, { description: e.target.value })} onBlur={(e) => patchAndSave(task.id, { description: e.target.value })} rows={4} style={{ ...cellInput, minHeight: 96, lineHeight: 1.45, resize: "vertical", whiteSpace: "pre-wrap" }} /></EditableCell>
                       <EditableCell w={165}><select value={task.ownerId || ""} onChange={(e) => patchAndSave(task.id, { ownerId: e.target.value })} style={cellInput}><option value="">—</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.importanceScore} onChange={(e) => patchAndSave(task.id, { importanceScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.urgencyScore} onChange={(e) => patchAndSave(task.id, { urgencyScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
