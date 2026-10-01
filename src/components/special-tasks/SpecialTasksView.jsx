@@ -179,6 +179,8 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
         return true;
       })
       .sort((a, b) => {
+        const doneDiff = Number(a.status === "done") - Number(b.status === "done");
+        if (doneDiff) return doneDiff;
         const scoreDiff = score(b) - score(a);
         if (scoreDiff) return scoreDiff;
         const urgencyDiff = Number(b.urgencyScore || 0) - Number(a.urgencyScore || 0);
