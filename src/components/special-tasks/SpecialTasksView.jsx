@@ -166,17 +166,25 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();
     const today = new Date().toISOString().slice(0, 10);
-    return tasks.filter((task) => {
-      const haystack = [task.title, task.description, task.comments, usersById.get(task.ownerId)?.name, dealsById.get(task.dealId)?.name].join(" ").toLowerCase();
-      if (q && !haystack.includes(q)) return false;
-      if (filters.ownerId && task.ownerId !== filters.ownerId) return false;
-      if (filters.status && task.status !== filters.status) return false;
-      if (filters.quadrant && quadrantFor(task) !== filters.quadrant) return false;
-      if (filters.dealId && task.dealId !== filters.dealId) return false;
-      if (filters.due === "overdue" && (!task.dueDate || task.dueDate >= today || task.status === "done" || task.status === "cancelled")) return false;
-      if (filters.due === "withDue" && !task.dueDate) return false;
-      return true;
-    });
+    return tasks
+      .filter((task) => {
+        const haystack = [task.title, task.description, task.comments, usersById.get(task.ownerId)?.name, dealsById.get(task.dealId)?.name].join(" ").toLowerCase();
+        if (q && !haystack.includes(q)) return false;
+        if (filters.ownerId && task.ownerId !== filters.ownerId) return false;
+        if (filters.status && task.status !== filters.status) return false;
+        if (filters.quadrant && quadrantFor(task) !== filters.quadrant) return false;
+        if (filters.dealId && task.dealId !== filters.dealId) return false;
+        if (filters.due === "overdue" && (!task.dueDate || task.dueDate >= today || task.status === "done" || task.status === "cancelled")) return false;
+        if (filters.due === "withDue" && !task.dueDate) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const scoreDiff = score(b) - score(a);
+        if (scoreDiff) return scoreDiff;
+        const urgencyDiff = Number(b.urgencyScore || 0) - Number(a.urgencyScore || 0);
+        if (urgencyDiff) return urgencyDiff;
+        return String(a.dueDate || "9999-12-31").localeCompare(String(b.dueDate || "9999-12-31"));
+      });
   }, [tasks, search, filters, usersById, dealsById]);
 
   const summary = QUADRANTS.map((q) => ({ ...q, count: filteredTasks.filter((task) => quadrantFor(task) === q.key).length }));
