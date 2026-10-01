@@ -19,6 +19,8 @@ const QUADRANTS = [
 
 const inputStyle = { width: "100%", boxSizing: "border-box", background: "transparent", border: "1px solid transparent", borderRadius: 8, padding: "7px 9px", color: "#0f172a", fontSize: 12, fontFamily: "inherit", outline: "none" };
 const filterStyle = { width: "100%", background: "#f8fafc", border: "1px solid #cfd8e3", borderRadius: 10, padding: "8px 11px", color: "#0f172a", fontSize: 13, fontFamily: "inherit", outline: "none" };
+const GRID_COLUMNS = [360, 560, 170, 96, 96, 76, 150, 140, 140, 230, 280, 76, 82];
+const GRID_WIDTH = GRID_COLUMNS.reduce((sum, w) => sum + w, 0);
 const uid = () => crypto.randomUUID();
 const score = (task) => Number(task.importanceScore || 0) + Number(task.urgencyScore || 0);
 const isHigh = (value) => Number(value || 0) >= 3; // 1–2 = bajo, 3–5 = alto para que el score refleje prioridad real
@@ -212,7 +214,8 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
             <div style={{ fontSize: 11, color: "#64748b" }}>Tip: crea una fila, escribe el título y sal de la celda para guardar.</div>
           </div>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1720, fontSize: 12, tableLayout: "fixed" }}> 
+            <table style={{ width: GRID_WIDTH, minWidth: GRID_WIDTH, borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
+              <colgroup>{GRID_COLUMNS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
               <thead><tr style={{ background: "#f8fafc", color: "#475569" }}>{["Tarea", "Descripción amplia", "Responsable", "Imp. (5 alto)", "Urg. (5 alto)", "Score", "Cuadrante", "Estado", "Fecha límite", "Deal", "Comentarios", "Sync", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
               <tbody>
                 {filteredTasks.map((task) => {
@@ -221,7 +224,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                   const cellInput = { ...inputStyle };
                   return (
                     <tr key={task.id} style={{ background: task.isNew ? "#f8fafc" : "#fff" }}>
-                      <EditableCell w={210}><input value={task.title} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700 }} /></EditableCell>
+                      <EditableCell w={360}><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} /></EditableCell>
                       <EditableCell w={560}><input value={task.description || ""} title={task.description || ""} onChange={(e) => updateLocal(task.id, { description: e.target.value })} onBlur={(e) => patchAndSave(task.id, { description: e.target.value })} style={{ ...cellInput, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} /></EditableCell>
                       <EditableCell w={165}><select value={task.ownerId || ""} onChange={(e) => patchAndSave(task.id, { ownerId: e.target.value })} style={cellInput}><option value="">—</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.importanceScore} onChange={(e) => patchAndSave(task.id, { importanceScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
