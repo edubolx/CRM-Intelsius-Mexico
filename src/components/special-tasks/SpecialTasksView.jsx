@@ -229,15 +229,16 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                 {filteredTasks.map((task) => {
                   const q = QUADRANTS.find((x) => x.key === quadrantFor(task));
                   const saveState = savingById[task.id];
-                  const cellInput = { ...inputStyle };
+                  const isDone = task.status === "done";
+                  const cellInput = { ...inputStyle, color: isDone ? "#64748b" : "#0f172a" };
                   return (
-                    <tr key={task.id} style={{ background: task.isNew ? "#f8fafc" : "#fff" }}>
-                      <EditableCell w={720}><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} /></EditableCell>
+                    <tr key={task.id} style={{ background: isDone ? "#f1f5f9" : task.isNew ? "#f8fafc" : "#fff", opacity: isDone ? .78 : 1 }}>
+                      <EditableCell w={720}><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: isDone ? "line-through" : "none" }} /></EditableCell>
                       <EditableCell w={165}><select value={task.ownerId || ""} onChange={(e) => patchAndSave(task.id, { ownerId: e.target.value })} style={cellInput}><option value="">—</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.importanceScore} onChange={(e) => patchAndSave(task.id, { importanceScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.urgencyScore} onChange={(e) => patchAndSave(task.id, { urgencyScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
-                      <EditableCell w={70}><div style={{ padding: "9px 10px", fontWeight: 900, color: q?.color }}>{score(task)}</div></EditableCell>
-                      <EditableCell w={145}><div style={{ padding: "9px 10px", color: q?.color, fontWeight: 800 }}>{q?.title}</div></EditableCell>
+                      <EditableCell w={70}><div style={{ padding: "9px 10px", fontWeight: 900, color: isDone ? "#94a3b8" : q?.color }}>{score(task)}</div></EditableCell>
+                      <EditableCell w={145}><div style={{ padding: "9px 10px", color: isDone ? "#94a3b8" : q?.color, fontWeight: 800 }}>{q?.title}</div></EditableCell>
                       <EditableCell w={135}><select value={task.status || "notStarted"} onChange={(e) => patchAndSave(task.id, { status: e.target.value })} style={cellInput}>{STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></EditableCell>
                       <EditableCell w={135}><input type="date" value={task.dueDate || ""} onChange={(e) => patchAndSave(task.id, { dueDate: e.target.value })} style={cellInput} /></EditableCell>
                       <EditableCell w={210}><select value={task.dealId || ""} onChange={(e) => patchAndSave(task.id, { dealId: e.target.value })} style={cellInput}><option value="">—</option>{deals.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></EditableCell>
