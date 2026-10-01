@@ -11,6 +11,7 @@ import ProspectingCompanyForm from './components/prospecting/ProspectingCompanyF
 import ProspectingContactForm from './components/prospecting/ProspectingContactForm.jsx'
 import ProspectingActivityForm from './components/prospecting/ProspectingActivityForm.jsx'
 import ProjectionsView from './components/projections/ProjectionsView.jsx'
+import SpecialTasksView from './components/special-tasks/SpecialTasksView.jsx'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -1779,7 +1780,7 @@ function AppInner(){
   const fUsaDl=useMemo(()=>dls.filter(d=>isUsaHandoverDeal(d) && d.name.toLowerCase().includes(ql)),[dls,ql]);
   const fUs=useMemo(()=>users.filter(u=>u.name.toLowerCase().includes(ql)||u.alias?.toLowerCase().includes(ql)||u.email?.toLowerCase().includes(ql)),[users,ql]);
 
-  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"usa",l:"USA Handover",i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"projections",l:t.projections,i:"chart"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
+  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"usa",l:"USA Handover",i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"projections",l:t.projections,i:"chart"},{k:"specialTasks",l:"Tareas especiales",i:"meddic"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
   const addL=(tab==="deals"||tab==="usa")?t.newDeal:tab==="companies"?t.newCompany:tab==="contacts"?t.newContact:tab==="users"?t.newUser:null;
   const addT=(tab==="deals"||tab==="usa")?"deal":tab==="companies"?"company":tab==="contacts"?"contact":tab==="users"?"user":null;
 
@@ -1923,6 +1924,13 @@ function AppInner(){
               deals={dls}
               stages={mexicoStages}
               currency={currency}
+            />
+          )}
+          {tab==="specialTasks"&&(
+            <SpecialTasksView
+              users={users}
+              deals={dls}
+              search={q}
             />
           )}
           {tab==="activities"&&(
