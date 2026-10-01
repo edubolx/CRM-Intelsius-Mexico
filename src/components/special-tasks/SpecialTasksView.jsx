@@ -19,7 +19,7 @@ const QUADRANTS = [
 
 const inputStyle = { width: "100%", boxSizing: "border-box", background: "transparent", border: "1px solid transparent", borderRadius: 8, padding: "7px 9px", color: "#0f172a", fontSize: 12, fontFamily: "inherit", outline: "none" };
 const filterStyle = { width: "100%", background: "#f8fafc", border: "1px solid #cfd8e3", borderRadius: 10, padding: "8px 11px", color: "#0f172a", fontSize: 13, fontFamily: "inherit", outline: "none" };
-const GRID_COLUMNS = [360, 560, 170, 96, 96, 76, 150, 140, 140, 230, 280, 76, 82];
+const GRID_COLUMNS = [720, 170, 96, 96, 76, 150, 140, 140, 230, 280, 76, 82];
 const GRID_WIDTH = GRID_COLUMNS.reduce((sum, w) => sum + w, 0);
 const uid = () => crypto.randomUUID();
 const score = (task) => Number(task.importanceScore || 0) + Number(task.urgencyScore || 0);
@@ -216,7 +216,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: GRID_WIDTH, minWidth: GRID_WIDTH, borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
               <colgroup>{GRID_COLUMNS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
-              <thead><tr style={{ background: "#f8fafc", color: "#475569" }}>{["Tarea", "Descripción amplia", "Responsable", "Imp. (5 alto)", "Urg. (5 alto)", "Score", "Cuadrante", "Estado", "Fecha límite", "Deal", "Comentarios", "Sync", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
+              <thead><tr style={{ background: "#f8fafc", color: "#475569" }}>{["Tarea", "Responsable", "Imp. (5 alto)", "Urg. (5 alto)", "Score", "Cuadrante", "Estado", "Fecha límite", "Deal", "Comentarios", "Sync", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
               <tbody>
                 {filteredTasks.map((task) => {
                   const q = QUADRANTS.find((x) => x.key === quadrantFor(task));
@@ -224,8 +224,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                   const cellInput = { ...inputStyle };
                   return (
                     <tr key={task.id} style={{ background: task.isNew ? "#f8fafc" : "#fff" }}>
-                      <EditableCell w={360}><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} /></EditableCell>
-                      <EditableCell w={560}><input value={task.description || ""} title={task.description || ""} onChange={(e) => updateLocal(task.id, { description: e.target.value })} onBlur={(e) => patchAndSave(task.id, { description: e.target.value })} style={{ ...cellInput, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} /></EditableCell>
+                      <EditableCell w={720}><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} /></EditableCell>
                       <EditableCell w={165}><select value={task.ownerId || ""} onChange={(e) => patchAndSave(task.id, { ownerId: e.target.value })} style={cellInput}><option value="">—</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.importanceScore} onChange={(e) => patchAndSave(task.id, { importanceScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.urgencyScore} onChange={(e) => patchAndSave(task.id, { urgencyScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
@@ -240,7 +239,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                     </tr>
                   );
                 })}
-                {filteredTasks.length === 0 && <tr><td colSpan="13" style={{ padding: 24, color: "#94a3b8", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" }}>Sin tareas especiales. Usa “+ Nueva fila”.</td></tr>}
+                {filteredTasks.length === 0 && <tr><td colSpan="12" style={{ padding: 24, color: "#94a3b8", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" }}>Sin tareas especiales. Usa “+ Nueva fila”.</td></tr>}
               </tbody>
             </table>
           </div>
