@@ -17,21 +17,8 @@ const QUADRANTS = [
   { key: "backlog", title: "Backlog / Eliminate", subtitle: "Baja urgencia + baja importancia", color: "#64748b", bg: "#f1f5f9" },
 ];
 
-const emptyTask = {
-  title: "",
-  description: "",
-  ownerId: "",
-  importanceScore: 3,
-  urgencyScore: 3,
-  dueDate: "",
-  status: "notStarted",
-  dealId: "",
-  comments: "",
-};
-
-const inputStyle = { width: "100%", background: "#f8fafc", border: "1px solid #cfd8e3", borderRadius: 10, padding: "8px 11px", color: "#0f172a", fontSize: 13, fontFamily: "inherit", outline: "none" };
-const labelStyle = { display: "block", fontSize: 10, color: "#64748b", marginBottom: 4, letterSpacing: .8, textTransform: "uppercase", fontFamily: "'JetBrains Mono',monospace" };
-
+const inputStyle = { width: "100%", background: "transparent", border: "1px solid transparent", borderRadius: 8, padding: "7px 9px", color: "#0f172a", fontSize: 12, fontFamily: "inherit", outline: "none" };
+const filterStyle = { width: "100%", background: "#f8fafc", border: "1px solid #cfd8e3", borderRadius: 10, padding: "8px 11px", color: "#0f172a", fontSize: 13, fontFamily: "inherit", outline: "none" };
 const uid = () => crypto.randomUUID();
 const score = (task) => Number(task.importanceScore || 0) + Number(task.urgencyScore || 0);
 const isHigh = (value) => Number(value || 0) >= 4;
@@ -44,135 +31,83 @@ const quadrantFor = (task) => {
   return "backlog";
 };
 const statusLabel = (value) => STATUSES.find((s) => s.value === value)?.label || value;
+const newTask = () => ({
+  id: uid(),
+  title: "",
+  description: "",
+  ownerId: "",
+  dealId: "",
+  importanceScore: 3,
+  urgencyScore: 3,
+  dueDate: "",
+  status: "notStarted",
+  comments: "",
+  isNew: true,
+});
 
-function Field({ label, children }) {
-  return <div style={{ marginBottom: 12 }}>{label && <label style={labelStyle}>{label}</label>}{children}</div>;
+function rowToTask(row) {
+  return {
+    id: row.id,
+    title: row.title || "",
+    description: row.description || "",
+    ownerId: row.owner_id || "",
+    dealId: row.deal_id || "",
+    importanceScore: row.importance_score ?? 3,
+    urgencyScore: row.urgency_score ?? 3,
+    eisenhowerScore: row.eisenhower_score ?? Number(row.importance_score || 0) + Number(row.urgency_score || 0),
+    dueDate: row.due_date || "",
+    status: row.status || "notStarted",
+    comments: row.comments || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    isNew: false,
+  };
 }
 
-function TaskForm({ initialTask, users, deals, onSave, onCancel, saving }) {
-  const [form, setForm] = useState(initialTask || emptyTask);
-  const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
-  const finalScore = score(form);
-
-  return (
-    <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 16, padding: 16, boxShadow: "0 6px 18px rgba(15,23,42,.08)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
-        <div>
-          <h3 style={{ margin: 0, fontSize: 16, color: "#0f172a" }}>{form.id ? "Editar tarea especial" : "Nueva tarea especial"}</h3>
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Score final: <b>{finalScore}</b> · {QUADRANTS.find((q) => q.key === quadrantFor(form))?.title}</div>
-        </div>
-        <button onClick={onCancel} style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 10, padding: "7px 12px", cursor: "pointer", color: "#334155" }}>Cerrar</button>
-      </div>
-
-      <Field label="Título">
-        <input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="Ej. Resolver tema especial de operación" style={inputStyle} />
-      </Field>
-      <Field label="Descripción">
-        <textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
-      </Field>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 10 }}>
-        <Field label="Responsable">
-          <select value={form.ownerId || ""} onChange={(e) => set("ownerId", e.target.value)} style={inputStyle}>
-            <option value="">— Sin responsable —</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}
-          </select>
-        </Field>
-        <Field label="Deal relacionado">
-          <select value={form.dealId || ""} onChange={(e) => set("dealId", e.target.value)} style={inputStyle}>
-            <option value="">— Sin deal —</option>
-            {deals.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Fecha límite">
-          <input type="date" value={form.dueDate || ""} onChange={(e) => set("dueDate", e.target.value)} style={inputStyle} />
-        </Field>
-        <Field label="Estado">
-          <select value={form.status || "notStarted"} onChange={(e) => set("status", e.target.value)} style={inputStyle}>
-            {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </Field>
-        <Field label="Importancia 1–5">
-          <select value={form.importanceScore} onChange={(e) => set("importanceScore", Number(e.target.value))} style={inputStyle}>
-            {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </Field>
-        <Field label="Urgencia 1–5">
-          <select value={form.urgencyScore} onChange={(e) => set("urgencyScore", Number(e.target.value))} style={inputStyle}>
-            {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </Field>
-      </div>
-      <Field label="Comentarios / notas">
-        <textarea value={form.comments || ""} onChange={(e) => set("comments", e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
-      </Field>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <button onClick={onCancel} style={{ background: "#fff", color: "#334155", border: "1px solid #cbd5e1", borderRadius: 10, padding: "8px 14px", cursor: "pointer" }}>Cancelar</button>
-        <button disabled={saving || !form.title.trim()} onClick={() => onSave(form)} style={{ background: "#003e7e", color: "#fff", border: "1px solid #003e7e", borderRadius: 10, padding: "8px 14px", cursor: saving ? "not-allowed" : "pointer", opacity: saving || !form.title.trim() ? .65 : 1 }}>{saving ? "Guardando..." : "Guardar"}</button>
-      </div>
-    </div>
-  );
+function taskToRow(task) {
+  const now = new Date().toISOString();
+  const row = {
+    id: task.id,
+    title: String(task.title || "").trim(),
+    description: task.description || null,
+    owner_id: task.ownerId || null,
+    deal_id: task.dealId || null,
+    importance_score: Number(task.importanceScore || 0),
+    urgency_score: Number(task.urgencyScore || 0),
+    due_date: task.dueDate || null,
+    status: task.status || "notStarted",
+    comments: task.comments || null,
+    updated_at: now,
+  };
+  if (task.isNew) row.created_at = now;
+  return row;
 }
 
-function TaskCard({ task, usersById, dealsById, onEdit, onDelete }) {
-  const q = QUADRANTS.find((x) => x.key === quadrantFor(task));
-  return (
-    <div style={{ background: "#fff", border: `1px solid ${q?.color || "#cbd5e1"}33`, borderLeft: `4px solid ${q?.color || "#64748b"}`, borderRadius: 12, padding: 10, marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{task.title}</div>
-        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: q?.color, fontWeight: 700 }}>{score(task)}</div>
-      </div>
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, lineHeight: 1.45 }}>
-        {usersById.get(task.ownerId)?.name || usersById.get(task.ownerId)?.alias || "Sin responsable"}
-        {task.dueDate ? ` · ${task.dueDate}` : ""}
-        {task.dealId ? ` · ${dealsById.get(task.dealId)?.name || "Deal"}` : ""}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8 }}>
-        <span style={{ fontSize: 10, color: "#334155", background: "#f1f5f9", borderRadius: 999, padding: "3px 8px" }}>{statusLabel(task.status)}</span>
-        <div style={{ display: "flex", gap: 4 }}>
-          <button onClick={() => onEdit(task)} style={{ background: "none", border: "none", color: "#003e7e", cursor: "pointer", fontSize: 11 }}>Editar</button>
-          <button onClick={() => onDelete(task)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 11 }}>Eliminar</button>
-        </div>
-      </div>
-    </div>
-  );
+function EditableCell({ children, w = 120 }) {
+  return <td style={{ padding: 0, borderBottom: "1px solid #eef2f7", minWidth: w, verticalAlign: "top" }}>{children}</td>;
 }
 
 export default function SpecialTasksView({ users = [], deals = [], search = "" }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [editingTask, setEditingTask] = useState(null);
+  const [savingById, setSavingById] = useState({});
   const [filters, setFilters] = useState({ ownerId: "", status: "", quadrant: "", dealId: "", due: "" });
 
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
   const dealsById = useMemo(() => new Map(deals.map((d) => [d.id, d])), [deals]);
 
-  const loadTasks = async () => {
-    setLoading(true);
+  const loadTasks = async ({ quiet = false } = {}) => {
+    if (!quiet) setLoading(true);
     setError("");
     const { data, error: loadError } = await supabase.from("special_tasks").select("*").order("eisenhower_score", { ascending: false }).order("due_date", { ascending: true });
     if (loadError) {
       setError(loadError.message || "No se pudieron cargar las tareas especiales.");
       setTasks([]);
     } else {
-      setTasks((data || []).map((row) => ({
-        id: row.id,
-        title: row.title || "",
-        description: row.description || "",
-        ownerId: row.owner_id || "",
-        dealId: row.deal_id || "",
-        importanceScore: row.importance_score ?? 3,
-        urgencyScore: row.urgency_score ?? 3,
-        eisenhowerScore: row.eisenhower_score ?? Number(row.importance_score || 0) + Number(row.urgency_score || 0),
-        dueDate: row.due_date || "",
-        status: row.status || "notStarted",
-        comments: row.comments || "",
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      })));
+      setTasks((data || []).map(rowToTask));
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { loadTasks(); }, []);
@@ -181,10 +116,52 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
     if (!supabase) return undefined;
     const channel = supabase
       .channel("crm-realtime-special_tasks")
-      .on("postgres_changes", { event: "*", schema: "public", table: "special_tasks" }, loadTasks)
+      .on("postgres_changes", { event: "*", schema: "public", table: "special_tasks" }, () => loadTasks({ quiet: true }))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  const updateLocal = (id, patch) => setTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...patch } : task));
+
+  const saveTask = async (task) => {
+    if (!String(task.title || "").trim()) return;
+    setSavingById((prev) => ({ ...prev, [task.id]: "saving" }));
+    const { error: saveError } = await supabase.from("special_tasks").upsert([taskToRow(task)], { onConflict: "id" }).select("*").single();
+    if (saveError) {
+      setSavingById((prev) => ({ ...prev, [task.id]: "error" }));
+      setError(saveError.message || "No se pudo guardar la tarea.");
+      return;
+    }
+    setSavingById((prev) => ({ ...prev, [task.id]: "saved" }));
+    setTasks((prev) => prev.map((item) => item.id === task.id ? { ...item, isNew: false } : item));
+    setTimeout(() => setSavingById((prev) => ({ ...prev, [task.id]: "" })), 1400);
+  };
+
+  const patchAndSave = async (id, patch) => {
+    const task = tasks.find((x) => x.id === id);
+    if (!task) return;
+    const next = { ...task, ...patch };
+    updateLocal(id, patch);
+    await saveTask(next);
+  };
+
+  const addInlineRow = () => setTasks((prev) => [newTask(), ...prev]);
+
+  const deleteTask = async (task) => {
+    if (task.isNew && !task.title.trim()) {
+      setTasks((prev) => prev.filter((x) => x.id !== task.id));
+      return;
+    }
+    if (!window.confirm(`¿Eliminar tarea "${task.title || "sin título"}"?`)) return;
+    if (!task.isNew) {
+      const { error: deleteError } = await supabase.from("special_tasks").delete().eq("id", task.id);
+      if (deleteError) {
+        setError(deleteError.message || "No se pudo eliminar la tarea.");
+        return;
+      }
+    }
+    setTasks((prev) => prev.filter((x) => x.id !== task.id));
+  };
 
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -202,40 +179,6 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
     });
   }, [tasks, search, filters, usersById, dealsById]);
 
-  const saveTask = async (form) => {
-    const now = new Date().toISOString();
-    const row = {
-      id: form.id || uid(),
-      title: form.title.trim(),
-      description: form.description || null,
-      owner_id: form.ownerId || null,
-      deal_id: form.dealId || null,
-      importance_score: Number(form.importanceScore || 0),
-      urgency_score: Number(form.urgencyScore || 0),
-      due_date: form.dueDate || null,
-      status: form.status || "notStarted",
-      comments: form.comments || null,
-      updated_at: now,
-    };
-    if (!form.id) row.created_at = now;
-    setSaving(true);
-    const { error: saveError } = await supabase.from("special_tasks").upsert([row], { onConflict: "id" });
-    setSaving(false);
-    if (saveError) {
-      setError(saveError.message || "No se pudo guardar la tarea.");
-      return;
-    }
-    setEditingTask(null);
-    await loadTasks();
-  };
-
-  const deleteTask = async (task) => {
-    if (!window.confirm(`¿Eliminar tarea "${task.title}"?`)) return;
-    const { error: deleteError } = await supabase.from("special_tasks").delete().eq("id", task.id);
-    if (deleteError) setError(deleteError.message || "No se pudo eliminar la tarea.");
-    await loadTasks();
-  };
-
   const summary = QUADRANTS.map((q) => ({ ...q, count: filteredTasks.filter((task) => quadrantFor(task) === q.key).length }));
 
   return (
@@ -243,56 +186,62 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>Tareas especiales</h2>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Seguimiento operativo independiente con matriz Eisenhower y score directo.</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Grid editable directo: escribe en la celda y se guarda al salir o cambiar select.</div>
         </div>
-        <button onClick={() => setEditingTask(emptyTask)} style={{ background: "#003e7e", color: "#fff", border: "1px solid #003e7e", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontWeight: 600 }}>+ Nueva tarea</button>
+        <button onClick={addInlineRow} style={{ background: "#003e7e", color: "#fff", border: "1px solid #003e7e", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontWeight: 600 }}>+ Nueva fila</button>
       </div>
 
       {error && <div style={{ background: "#fde8e8", color: "#9a3535", border: "1px solid #d4a0a0", borderRadius: 12, padding: 12, fontSize: 12 }}>⚠️ {error}</div>}
-      {editingTask && <TaskForm initialTask={editingTask} users={users} deals={deals} onSave={saveTask} onCancel={() => setEditingTask(null)} saving={saving} />}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 10 }}>
         {summary.map((q) => <div key={q.key} style={{ background: q.bg, border: `1px solid ${q.color}33`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 10, color: q.color, fontFamily: "'JetBrains Mono',monospace", textTransform: "uppercase" }}>{q.title}</div><div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{q.count}</div><div style={{ fontSize: 11, color: "#64748b" }}>{q.subtitle}</div></div>)}
       </div>
 
       <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10 }}>
-        <select value={filters.ownerId} onChange={(e) => setFilters((f) => ({ ...f, ownerId: e.target.value }))} style={inputStyle}><option value="">Todos los responsables</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias}</option>)}</select>
-        <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} style={inputStyle}><option value="">Todos los estados</option>{STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
-        <select value={filters.quadrant} onChange={(e) => setFilters((f) => ({ ...f, quadrant: e.target.value }))} style={inputStyle}><option value="">Todos los cuadrantes</option>{QUADRANTS.map((q) => <option key={q.key} value={q.key}>{q.title}</option>)}</select>
-        <select value={filters.dealId} onChange={(e) => setFilters((f) => ({ ...f, dealId: e.target.value }))} style={inputStyle}><option value="">Todos los deals</option>{deals.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-        <select value={filters.due} onChange={(e) => setFilters((f) => ({ ...f, due: e.target.value }))} style={inputStyle}><option value="">Todas las fechas</option><option value="overdue">Vencidas</option><option value="withDue">Con fecha límite</option></select>
+        <select value={filters.ownerId} onChange={(e) => setFilters((f) => ({ ...f, ownerId: e.target.value }))} style={filterStyle}><option value="">Todos los responsables</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias}</option>)}</select>
+        <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} style={filterStyle}><option value="">Todos los estados</option>{STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
+        <select value={filters.quadrant} onChange={(e) => setFilters((f) => ({ ...f, quadrant: e.target.value }))} style={filterStyle}><option value="">Todos los cuadrantes</option>{QUADRANTS.map((q) => <option key={q.key} value={q.key}>{q.title}</option>)}</select>
+        <select value={filters.dealId} onChange={(e) => setFilters((f) => ({ ...f, dealId: e.target.value }))} style={filterStyle}><option value="">Todos los deals</option>{deals.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+        <select value={filters.due} onChange={(e) => setFilters((f) => ({ ...f, due: e.target.value }))} style={filterStyle}><option value="">Todas las fechas</option><option value="overdue">Vencidas</option><option value="withDue">Con fecha límite</option></select>
       </div>
 
       {loading ? <div style={{ color: "#64748b", fontSize: 12 }}>Cargando tareas especiales...</div> : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(245px,1fr))", gap: 12 }}>
-            {QUADRANTS.map((q) => (
-              <div key={q.key} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: 12, minHeight: 180 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div><div style={{ fontSize: 13, fontWeight: 800, color: q.color }}>{q.title}</div><div style={{ fontSize: 10, color: "#64748b" }}>{q.subtitle}</div></div>
-                  <span style={{ fontSize: 11, color: q.color, background: q.bg, borderRadius: 999, padding: "3px 8px" }}>{filteredTasks.filter((task) => quadrantFor(task) === q.key).length}</span>
-                </div>
-                {filteredTasks.filter((task) => quadrantFor(task) === q.key).map((task) => <TaskCard key={task.id} task={task} usersById={usersById} dealsById={dealsById} onEdit={setEditingTask} onDelete={deleteTask} />)}
-              </div>
-            ))}
+        <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ padding: "12px 14px", borderBottom: "1px solid #cbd5e1", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>Cuadrícula editable</div>
+            <div style={{ fontSize: 11, color: "#64748b" }}>Tip: crea una fila, escribe el título y sal de la celda para guardar.</div>
           </div>
-
-          <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "12px 14px", borderBottom: "1px solid #cbd5e1", fontSize: 13, fontWeight: 800 }}>Tabla detallada</div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 980, fontSize: 12 }}>
-                <thead><tr style={{ background: "#f8fafc", color: "#475569" }}>{["Tarea", "Responsable", "Imp.", "Urg.", "Score", "Cuadrante", "Estado", "Fecha límite", "Deal", "Acciones"].map((h) => <th key={h} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1" }}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {filteredTasks.map((task) => {
-                    const q = QUADRANTS.find((x) => x.key === quadrantFor(task));
-                    return <tr key={task.id} style={{ borderBottom: "1px solid #eef2f7" }}><td style={{ padding: "9px 10px", fontWeight: 700 }}>{task.title}<div style={{ fontSize: 10, color: "#64748b", fontWeight: 400 }}>{task.description}</div></td><td style={{ padding: "9px 10px" }}>{usersById.get(task.ownerId)?.name || usersById.get(task.ownerId)?.alias || "—"}</td><td style={{ padding: "9px 10px" }}>{task.importanceScore}</td><td style={{ padding: "9px 10px" }}>{task.urgencyScore}</td><td style={{ padding: "9px 10px", fontWeight: 800 }}>{score(task)}</td><td style={{ padding: "9px 10px", color: q?.color, fontWeight: 700 }}>{q?.title}</td><td style={{ padding: "9px 10px" }}>{statusLabel(task.status)}</td><td style={{ padding: "9px 10px" }}>{task.dueDate || "—"}</td><td style={{ padding: "9px 10px" }}>{dealsById.get(task.dealId)?.name || "—"}</td><td style={{ padding: "9px 10px" }}><button onClick={() => setEditingTask(task)} style={{ background: "none", border: "none", color: "#003e7e", cursor: "pointer" }}>Editar</button></td></tr>;
-                  })}
-                  {filteredTasks.length === 0 && <tr><td colSpan="10" style={{ padding: 24, color: "#94a3b8", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" }}>Sin tareas especiales.</td></tr>}
-                </tbody>
-              </table>
-            </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1320, fontSize: 12 }}>
+              <thead><tr style={{ background: "#f8fafc", color: "#475569" }}>{["Tarea", "Descripción", "Responsable", "Imp.", "Urg.", "Score", "Cuadrante", "Estado", "Fecha límite", "Deal", "Comentarios", "Sync", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
+              <tbody>
+                {filteredTasks.map((task) => {
+                  const q = QUADRANTS.find((x) => x.key === quadrantFor(task));
+                  const saveState = savingById[task.id];
+                  const cellInput = { ...inputStyle };
+                  return (
+                    <tr key={task.id} style={{ background: task.isNew ? "#f8fafc" : "#fff" }}>
+                      <EditableCell w={210}><input value={task.title} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700 }} /></EditableCell>
+                      <EditableCell w={260}><textarea value={task.description || ""} onChange={(e) => updateLocal(task.id, { description: e.target.value })} onBlur={(e) => patchAndSave(task.id, { description: e.target.value })} rows={2} style={{ ...cellInput, resize: "vertical" }} /></EditableCell>
+                      <EditableCell w={165}><select value={task.ownerId || ""} onChange={(e) => patchAndSave(task.id, { ownerId: e.target.value })} style={cellInput}><option value="">—</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}</select></EditableCell>
+                      <EditableCell w={72}><select value={task.importanceScore} onChange={(e) => patchAndSave(task.id, { importanceScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
+                      <EditableCell w={72}><select value={task.urgencyScore} onChange={(e) => patchAndSave(task.id, { urgencyScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
+                      <EditableCell w={70}><div style={{ padding: "9px 10px", fontWeight: 900, color: q?.color }}>{score(task)}</div></EditableCell>
+                      <EditableCell w={145}><div style={{ padding: "9px 10px", color: q?.color, fontWeight: 800 }}>{q?.title}</div></EditableCell>
+                      <EditableCell w={135}><select value={task.status || "notStarted"} onChange={(e) => patchAndSave(task.id, { status: e.target.value })} style={cellInput}>{STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></EditableCell>
+                      <EditableCell w={135}><input type="date" value={task.dueDate || ""} onChange={(e) => patchAndSave(task.id, { dueDate: e.target.value })} style={cellInput} /></EditableCell>
+                      <EditableCell w={210}><select value={task.dealId || ""} onChange={(e) => patchAndSave(task.id, { dealId: e.target.value })} style={cellInput}><option value="">—</option>{deals.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></EditableCell>
+                      <EditableCell w={250}><textarea value={task.comments || ""} onChange={(e) => updateLocal(task.id, { comments: e.target.value })} onBlur={(e) => patchAndSave(task.id, { comments: e.target.value })} rows={2} style={{ ...cellInput, resize: "vertical" }} /></EditableCell>
+                      <EditableCell w={72}><div style={{ padding: "9px 10px", fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: saveState === "error" ? "#ef4444" : saveState === "saved" ? "#16a34a" : "#94a3b8" }}>{saveState === "saving" ? "..." : saveState === "saved" ? "saved" : saveState === "error" ? "error" : task.isNew ? "new" : ""}</div></EditableCell>
+                      <EditableCell w={76}><button onClick={() => deleteTask(task)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "9px 10px", fontSize: 11 }}>Eliminar</button></EditableCell>
+                    </tr>
+                  );
+                })}
+                {filteredTasks.length === 0 && <tr><td colSpan="13" style={{ padding: 24, color: "#94a3b8", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" }}>Sin tareas especiales. Usa “+ Nueva fila”.</td></tr>}
+              </tbody>
+            </table>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
