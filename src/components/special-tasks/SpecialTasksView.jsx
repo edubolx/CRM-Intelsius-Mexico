@@ -23,14 +23,12 @@ const GRID_COLUMNS = [720, 170, 96, 96, 76, 150, 140, 140, 230, 280, 76, 82];
 const GRID_WIDTH = GRID_COLUMNS.reduce((sum, w) => sum + w, 0);
 const uid = () => crypto.randomUUID();
 const score = (task) => Number(task.importanceScore || 0) + Number(task.urgencyScore || 0);
-const isHigh = (value) => Number(value || 0) >= 3; // 1–2 = bajo, 3–5 = alto para que el score refleje prioridad real
 const quadrantFor = (task) => {
-  const highImportance = isHigh(task.importanceScore);
-  const highUrgency = isHigh(task.urgencyScore);
-  if (highImportance && highUrgency) return "doNow";      // importante + urgente
-  if (highImportance && !highUrgency) return "schedule";   // importante + no urgente
-  if (!highImportance && highUrgency) return "delegate";   // no tan importante + urgente
-  return "backlog";                                        // no tan importante + no urgente
+  const total = score(task);
+  if (total >= 8) return "doNow";
+  if (total >= 6) return "schedule";
+  if (total >= 4) return "delegate";
+  return "backlog";
 };
 const statusLabel = (value) => STATUSES.find((s) => s.value === value)?.label || value;
 const newTask = () => ({
@@ -188,7 +186,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>Tareas especiales</h2>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Grid editable directo. Escala: 1 bajo · 5 alto; desde 3 cuenta como prioridad alta.</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Grid editable directo. Score = importancia + urgencia; misma suma = misma categoría.</div>
         </div>
         <button onClick={addInlineRow} style={{ background: "#003e7e", color: "#fff", border: "1px solid #003e7e", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontWeight: 600 }}>+ Nueva fila</button>
       </div>
