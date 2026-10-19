@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { supabase } from "../../supabaseClient.js";
+import { childProgress } from "./subtaskModel.js";
+import { createSubtaskRepository, createSubtaskStore } from "./subtaskStore.js";
+import { SubtaskControls, SubtaskPanel } from "./SubtaskPanel.jsx";
 
 const STATUSES = [
   { value: "notStarted", label: "Not started" },
@@ -93,6 +96,25 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
   const [error, setError] = useState("");
   const [savingById, setSavingById] = useState({});
   const [filters, setFilters] = useState({ ownerId: "", status: "", quadrant: "", dealId: "", due: "" });
+  const [subtaskStore] = useState(() => createSubtaskStore(createSubtaskRepository(supabase)));
+  const subtasks = useSyncExternalStore(subtaskStore.subscribe, subtaskStore.getSnapshot);
+  const [expandedById, setExpandedById] = useState({});
+
+  useEffect(() => {
+    subtaskStore.load();
+    if (!supabase) return undefined;
+    const childChannel = supabase
+      .channel("crm-realtime-special_task_subtasks")
+      .on("postgres_changes", { event: "*", schema: "public", table: "special_task_subtasks" }, () => subtaskStore.load())
+      .subscribe();
+    return () => { supabase.removeChannel(childChannel); };
+  }, [subtaskStore]);
+
+  const addSubtask = (task) => {
+    if (task.isNew) return;
+    subtaskStore.add(task, uid());
+    setExpandedById((previous) => ({ ...previous, [task.id]: true }));
+  };
 
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
   const dealsById = useMemo(() => new Map(deals.map((d) => [d.id, d])), [deals]);
@@ -152,7 +174,9 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
       setTasks((prev) => prev.filter((x) => x.id !== task.id));
       return;
     }
-    if (!window.confirm(`¿Eliminar tarea "${task.title || "sin título"}"?`)) return;
+    const childCount = childProgress(subtaskStore.getSnapshot().rows, task.id).total;
+    const childWarning = childCount ? ` También se eliminarán sus ${childCount} subtareas guardadas.` : subtasks.loading || subtasks.error ? " Las subtareas asociadas también se eliminarán; no se pudo confirmar su número." : "";
+    if (!window.confirm(`¿Eliminar tarea "${task.title || "sin título"}"?${childWarning}`)) return;
     if (!task.isNew) {
       const { error: deleteError } = await supabase.from("special_tasks").delete().eq("id", task.id);
       if (deleteError) {
@@ -202,6 +226,8 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
       </div>
 
       {error && <div style={{ background: "#fde8e8", color: "#9a3535", border: "1px solid #d4a0a0", borderRadius: 12, padding: 12, fontSize: 12 }}>⚠️ {error}</div>}
+      {subtasks.error && <div role="alert" style={{ background: "#fde8e8", color: "#9a3535", borderRadius: 12, padding: 12, fontSize: 12 }}>No se pudieron actualizar las subtareas: {subtasks.error} <button type="button" onClick={() => subtaskStore.load()}>Reintentar carga</button></div>}
+      {subtasks.loading && <div role="status" style={{ color: "#64748b", fontSize: 12 }}>Cargando subtareas…</div>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 10 }}>
         {summary.map((q) => <div key={q.key} style={{ background: q.bg, border: `1px solid ${q.color}33`, borderRadius: 12, padding: 12 }}><div style={{ fontSize: 10, color: q.color, fontFamily: "'JetBrains Mono',monospace", textTransform: "uppercase" }}>{q.title}</div><div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{q.count}</div><div style={{ fontSize: 11, color: "#64748b" }}>{q.subtitle}</div></div>)}
@@ -232,8 +258,9 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                   const isDone = task.status === "done";
                   const cellInput = { ...inputStyle, color: isDone ? "#64748b" : "#0f172a" };
                   return (
-                    <tr key={task.id} style={{ background: isDone ? "#f1f5f9" : task.isNew ? "#f8fafc" : "#fff", opacity: isDone ? .78 : 1 }}>
-                      <EditableCell w={720}><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: isDone ? "line-through" : "none" }} /></EditableCell>
+                    <Fragment key={task.id}>
+                    <tr style={{ background: isDone ? "#f1f5f9" : task.isNew ? "#f8fafc" : "#fff", opacity: isDone ? .78 : 1 }}>
+                      <EditableCell w={720}><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: isDone ? "line-through" : "none" }} /><SubtaskControls task={task} expanded={!!expandedById[task.id]} progress={childProgress(subtasks.rows, task.id)} onToggle={() => setExpandedById((previous) => ({ ...previous, [task.id]: !previous[task.id] }))} onAdd={() => addSubtask(task)} /></EditableCell>
                       <EditableCell w={165}><select value={task.ownerId || ""} onChange={(e) => patchAndSave(task.id, { ownerId: e.target.value })} style={cellInput}><option value="">—</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.importanceScore} onChange={(e) => patchAndSave(task.id, { importanceScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.urgencyScore} onChange={(e) => patchAndSave(task.id, { urgencyScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
@@ -246,6 +273,8 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                       <EditableCell w={72}><div style={{ padding: "9px 10px", fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: saveState === "error" ? "#ef4444" : saveState === "saved" ? "#16a34a" : "#94a3b8" }}>{saveState === "saving" ? "..." : saveState === "saved" ? "saved" : saveState === "error" ? "error" : task.isNew ? "new" : ""}</div></EditableCell>
                       <EditableCell w={76}><button onClick={() => deleteTask(task)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "9px 10px", fontSize: 11 }}>Eliminar</button></EditableCell>
                     </tr>
+                    <SubtaskPanel task={task} expanded={!!expandedById[task.id]} rows={subtasks.rows} users={users} statuses={STATUSES} store={subtaskStore} />
+                    </Fragment>
                   );
                 })}
                 {filteredTasks.length === 0 && <tr><td colSpan="12" style={{ padding: 24, color: "#94a3b8", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" }}>Sin tareas especiales. Usa “+ Nueva fila”.</td></tr>}
