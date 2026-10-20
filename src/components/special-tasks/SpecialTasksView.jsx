@@ -110,9 +110,12 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
     return () => { supabase.removeChannel(childChannel); };
   }, [subtaskStore]);
 
-  const addSubtask = (task) => {
-    if (task.isNew) return;
-    subtaskStore.add(task, uid());
+  const addSubtask = (task, title) => {
+    if (task.isNew || !title?.trim()) return;
+    const childId = uid();
+    subtaskStore.add(task, childId);
+    subtaskStore.edit(task.id, childId, { title });
+    subtaskStore.save(task.id, childId);
     setExpandedById((previous) => ({ ...previous, [task.id]: true }));
   };
 
@@ -260,7 +263,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                   return (
                     <Fragment key={task.id}>
                     <tr style={{ background: isDone ? "#f1f5f9" : task.isNew ? "#f8fafc" : "#fff", opacity: isDone ? .78 : 1 }}>
-                      <EditableCell w={720}><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: isDone ? "line-through" : "none" }} /><SubtaskControls task={task} expanded={!!expandedById[task.id]} progress={childProgress(subtasks.rows, task.id)} onToggle={() => setExpandedById((previous) => ({ ...previous, [task.id]: !previous[task.id] }))} onAdd={() => addSubtask(task)} /></EditableCell>
+                      <EditableCell w={720}><div style={{ display: "flex", alignItems: "center", paddingLeft: 3 }}><SubtaskControls task={task} expanded={!!expandedById[task.id]} progress={childProgress(subtasks.rows, task.id)} onToggle={() => setExpandedById((previous) => ({ ...previous, [task.id]: !previous[task.id] }))} /><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, minWidth: 0, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: isDone ? "line-through" : "none" }} /></div></EditableCell>
                       <EditableCell w={165}><select value={task.ownerId || ""} onChange={(e) => patchAndSave(task.id, { ownerId: e.target.value })} style={cellInput}><option value="">—</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.importanceScore} onChange={(e) => patchAndSave(task.id, { importanceScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.urgencyScore} onChange={(e) => patchAndSave(task.id, { urgencyScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>
@@ -273,7 +276,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                       <EditableCell w={72}><div style={{ padding: "9px 10px", fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: saveState === "error" ? "#ef4444" : saveState === "saved" ? "#16a34a" : "#94a3b8" }}>{saveState === "saving" ? "..." : saveState === "saved" ? "saved" : saveState === "error" ? "error" : task.isNew ? "new" : ""}</div></EditableCell>
                       <EditableCell w={76}><button onClick={() => deleteTask(task)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "9px 10px", fontSize: 11 }}>Eliminar</button></EditableCell>
                     </tr>
-                    <SubtaskPanel task={task} expanded={!!expandedById[task.id]} rows={subtasks.rows} users={users} statuses={STATUSES} store={subtaskStore} />
+                    <SubtaskPanel task={task} expanded={!!expandedById[task.id]} rows={subtasks.rows} users={users} statuses={STATUSES} store={subtaskStore} onAdd={(title) => addSubtask(task, title)} />
                     </Fragment>
                   );
                 })}

@@ -14,7 +14,7 @@ async function components() {
   return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 }
 
-test('disclosure is accessible, reports progress while closed and disables adding to unsaved parent', async () => {
+test('collapsed disclosure is a single discreet arrow, with accessible progress and unsaved-parent guard', async () => {
   const { SubtaskControls } = await components();
   const props = { task: { id: 'p', title: 'Parent', isNew: true }, expanded: false, progress: { done: 2, total: 5 }, onToggle() {}, onAdd() {} };
   const html = renderToStaticMarkup(React.createElement(SubtaskControls, props));
@@ -23,6 +23,18 @@ test('disclosure is accessible, reports progress while closed and disables addin
   assert.match(html, /2 de 5 completadas/);
   assert.match(html, /disabled=""/);
   assert.match(html, /Guarda primero/);
+  assert.equal(html.replace(/<[^>]*>/g, ''), '▸');
+  assert.equal((html.match(/<button/g) || []).length, 1);
+});
+
+test('empty dropdown immediately offers a blank composer without creating a stored draft', async () => {
+  const { SubtaskPanel } = await components();
+  const store = createSubtaskStore({ list: async () => [] });
+  const html = renderToStaticMarkup(React.createElement(SubtaskPanel, { task: { id: 'p' }, rows: [], store, users: [], statuses: [], expanded: true }));
+  assert.match(html, /aria-label="Nueva subtarea"/);
+  assert.match(html, /placeholder="Escribe una subtarea…"/);
+  assert.doesNotMatch(html, /Sin subtareas|no modifican el estado/);
+  assert.equal(store.getSnapshot().rows.length, 0);
 });
 
 test('child panel renders six statuses, required title, owner, date and visible retry without touching parents', async () => {
@@ -41,6 +53,16 @@ test('child panel renders six statuses, required title, owner, date and visible 
   assert.match(html, /Edu/);
 });
 
+test('existing children form a lightweight list with the add button inside the dropdown', async () => {
+  const { SubtaskPanel } = await components();
+  const child = { id: 'c', parentTaskId: 'p', title: 'Existing child', ownerId: '', dueDate: '', status: 'notStarted', sync: 'saved' };
+  const html = renderToStaticMarkup(React.createElement(SubtaskPanel, { task: { id: 'p' }, rows: [child], store: {}, users: [], statuses: [] }));
+  assert.match(html, /role="list"/);
+  assert.match(html, /role="listitem"/);
+  assert.match(html, /\+ Nueva subtarea/);
+  assert.doesNotMatch(html, /<thead|Guardado \/ acciones|aria-label="Nueva subtarea"/);
+});
+
 test('visible conflict retry explicitly authorizes saving but title blur does not', async () => {
   const { SubtaskPanel } = await components(); const calls = [];
   const child = { id: 'c', parentTaskId: 'p', title: 'Local draft', ownerId: '', dueDate: '', status: 'notStarted', isNew: false, sync: 'error', errorOperation: 'save', error: 'Conflicto', conflict: true };
@@ -51,6 +73,14 @@ test('visible conflict retry explicitly authorizes saving but title blur does no
   nodes.find(node => node.type === 'input' && node.props['aria-label'] === 'Título de subtarea').props.onBlur();
   nodes.find(node => node.type === 'button' && node.props.children === 'Reintentar').props.onClick();
   assert.deepEqual(calls, [['p', 'c'], ['p', 'c', { retry: true }]]);
+});
+
+test('composer is wired to one explicitly titled draft and save within the parent dropdown', async () => {
+  const source = await readFile(new URL('../src/components/special-tasks/SpecialTasksView.jsx', import.meta.url), 'utf8');
+  assert.match(source, /onAdd=\{\(title\) => addSubtask\(task, title\)\}/);
+  assert.match(source, /subtaskStore\.edit\(task\.id, childId, \{ title \}\)/);
+  assert.match(source, /subtaskStore\.save\(task\.id, childId\)/);
+  assert.match(source, /display: "flex", alignItems: "center".*<SubtaskControls/);
 });
 
 test('parent summary/filter pipeline stays separate; children load even when collapsed and realtime cleans up', async () => {
