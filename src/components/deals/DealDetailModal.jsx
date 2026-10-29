@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ActivitiesPanel from "../activities/ActivitiesPanel.jsx";
 import DealJournalPanel from "./DealJournalPanel.jsx";
+import ProductInterestSummary from "./ProductInterestSummary.jsx";
 
 export default function DealDetailModal({
   deal,
@@ -84,6 +85,7 @@ export default function DealDetailModal({
         ))}
       </div>
 
+      <ProductInterestSummary value={deal.productInterests ?? deal.product_interests ?? []} lang={lang} />
       {tab === "meddic" && <MeddicPanel deal={deal} lang={lang} t={t} onSaveEval={onSaveEval} onDeleteEval={onDeleteEval} />}
       {tab === "notes" && (
         <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>

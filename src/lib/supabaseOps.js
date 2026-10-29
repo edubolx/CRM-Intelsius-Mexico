@@ -1,3 +1,6 @@
+import { dealFromRow } from './dealModel.js';
+import { loadLocalData } from './localDeals.js';
+
 function dedupeById(items = []) {
   const map = new Map();
   items.forEach((item) => {
@@ -42,7 +45,7 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
     } catch {}
 
     const dls = (dlsRaw || []).map((d) => ({
-      ...d,
+      ...dealFromRow(d),
       value: Number(d.value),
       pipelineType: d.pipeline_type || (d.lead_source_custom === 'USA Handover - Michael' ? 'usa_handover' : 'mexico'),
       leadSource: d.lead_source || '',
@@ -117,6 +120,7 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
 }
 
 export async function storageGet({ supabase, SAMPLE_DATA, DEFAULT_STAGES }) {
+  if (!supabase) return loadLocalData(globalThis.localStorage, {...SAMPLE_DATA,stages:SAMPLE_DATA.stages || DEFAULT_STAGES});
   const sbData = await supabaseLoad({ supabase, DEFAULT_STAGES });
   if (sbData) {
     return {

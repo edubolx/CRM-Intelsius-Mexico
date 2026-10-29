@@ -1,4 +1,5 @@
 import { memo, useState } from "react";
+import ProductInterestSummary from "./ProductInterestSummary.jsx";
 
 const COMPACT_FINAL_STAGE_NAMES = new Set([
   "cerrado ganado",
@@ -17,7 +18,7 @@ const dealRecentStamp = (deal) => {
   return Number.isFinite(ts) ? ts : 0;
 };
 
-const Kanban = memo(function Kanban({ deals, cos, cts, t, currency, stages, onEdit, onDel, onStage, onViewDeal, fontSizeMode = "medium", helpers }) {
+const Kanban = memo(function Kanban({ deals, cos, cts, t, currency, stages, onEdit, onDel, onStage, onViewDeal, lang = "es", fontSizeMode = "medium", helpers }) {
   const { fv, calcTotal, scoreColor, MEDDIC_KEYS, MEDDIC_META, Ic } = helpers;
   const [drag, setDrag] = useState(null);
   const [over, setOver] = useState(null);
@@ -35,7 +36,7 @@ const Kanban = memo(function Kanban({ deals, cos, cts, t, currency, stages, onEd
     const mTotal = calcTotal(latestEv?.meddic);
     const hasMeddic = dl.meddicHistory?.length > 0;
     return (
-      <div key={dl.id} draggable onDragStart={() => setDrag(dl)} onDragEnd={() => { setDrag(null); setOver(null); }} style={{ background: "#f5f7fa", border: "1px solid #cbd5e1", borderRadius: 9, padding: "9px", cursor: "grab", userSelect: "none", opacity: drag?.id === dl.id ? .4 : 1, transition: "opacity .1s" }}>
+      <div key={dl.id} data-deal-id={dl.id} draggable onDragStart={() => setDrag(dl)} onDragEnd={() => { setDrag(null); setOver(null); }} style={{ background: "#f5f7fa", border: "1px solid #cbd5e1", borderRadius: 9, padding: "9px", cursor: "grab", userSelect: "none", opacity: drag?.id === dl.id ? .4 : 1, transition: "opacity .1s" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 3 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", lineHeight: 1.3, flex: 1 }}>{dl.name}</div>
           <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
@@ -47,6 +48,7 @@ const Kanban = memo(function Kanban({ deals, cos, cts, t, currency, stages, onEd
         {Number(dl.value) > 0 && <div style={{ fontSize: 13, fontWeight: 700, color: m.accent, marginTop: 4, fontFamily: "'Inter',Arial,sans-serif" }}>{fv(dl.value, currency)}</div>}
         {co && <div style={{ fontSize: 10, color: "#475569", marginTop: 3 }}>🏢 {co.name}</div>}
         {ct && <div style={{ fontSize: 10, color: "#475569" }}>👤 {ct.name}</div>}
+        <ProductInterestSummary value={dl.productInterests ?? dl.product_interests ?? []} compact lang={lang} />
         {dl.closingDate && <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 4, fontFamily: "'JetBrains Mono',monospace" }}>{t.closing}: {dl.closingDate}</div>}
 
         <div style={{ marginTop: 7, paddingTop: 7, borderTop: "1px solid #dce4ec", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onViewDeal(dl); }}>

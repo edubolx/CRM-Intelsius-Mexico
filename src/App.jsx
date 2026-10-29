@@ -5,6 +5,11 @@ import { CRMProvider, useCRM } from './state/CRMContext.jsx'
 import ActivitiesPanel from './components/activities/ActivitiesPanel.jsx'
 import ActivitiesDashboard from './components/activities/ActivitiesDashboard.jsx'
 import DealDetailModal from './components/deals/DealDetailModal.jsx'
+import ProductInterestEditor from './components/deals/ProductInterestEditor.jsx'
+import { dealFromRow, dealToRow } from './lib/dealModel.js'
+import { createDealSaveSession } from './lib/dealSave.js'
+import { saveDealSnapshot } from './lib/dealSnapshot.js'
+import { createLocalDealClient } from './lib/localDeals.js'
 import Kanban from './components/deals/Kanban.jsx'
 import ProspectingBoard from './components/prospecting/ProspectingBoard.jsx'
 import ProspectingCompanyForm from './components/prospecting/ProspectingCompanyForm.jsx'
@@ -436,7 +441,7 @@ async function supabaseLoad() {
 
     // Attach meddicHistory to each deal
     const dls = (dls_raw || []).map(d => ({
-      ...d,
+      ...dealFromRow(d),
       value: Number(d.value),
       wonAt: d.won_at || null,
       meddicHistory: (evals || [])
@@ -491,11 +496,7 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
     }
     // Upsert deals (without meddicHistory)
     if (dls.length > 0) {
-      await supabase.from('deals').upsert(
-        dls.map(({ id, name, value, stage, companyId: company_id, contactId: contact_id, closingDate: closing_date, notes, leadSource: lead_source, leadSourceCustom: lead_source_custom }) =>
-          ({ id, name, value, stage, company_id: company_id || null, contact_id: contact_id || null, closing_date, notes, lead_source, lead_source_custom })),
-        { onConflict: 'id' }
-      );
+      for (const deal of dls) await saveDealSnapshot(supabase, deal);
       // Upsert + sync deletes for MEDDIC evals
       const allEvals = dls.flatMap(d =>
         (d.meddicHistory || []).map(e => ({ id: e.id, deal_id: d.id, date: e.date, meddic: e.meddic }))
@@ -1118,7 +1119,13 @@ function CoForm({init={},t,onSave,onClose}){const[f,setF]=useState({name:"",indu
 function CtForm({init={},cos,t,onSave,onClose}){const[f,setF]=useState({name:"",email:"",phone:"",titleF:"",linkedin:"",companyId:"",notes:"",...init});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));const coOpts=[{v:"",l:t.selectOpt},...cos.map(c=>({v:c.id,l:c.name}))];return<><Inp label={t.name+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.name}/><Inp label={t.email} value={f.email} onChange={s("email")} placeholder={t.ph.email}/><Inp label={t.phone} value={f.phone} onChange={s("phone")} placeholder={t.ph.phone}/><Inp label={t.titleF} value={f.titleF} onChange={s("titleF")} placeholder={t.ph.titleF}/><Inp label={t.linkedin} value={f.linkedin} onChange={s("linkedin")} placeholder={t.ph.linkedin}/><Sel label={t.company} value={f.companyId} onChange={s("companyId")} opts={coOpts}/><Txta label={t.notes} value={f.notes} onChange={s("notes")}/><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}><Btn v="ghost" ch={t.cancel} onClick={onClose}/><Btn ch={t.save} onClick={()=>f.name&&onSave(f)}/></div></>;}
 function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
   const defaultStage=stages[0]?.name||"";
-  const [f,setF]=useState({name:"",value:0,stage:defaultStage,companyId:"",contactId:"",leadSource:"",leadSourceCustom:"",closingDate:"",notes:"",...init});
+  const [initial] = useState(() => ({name:"",value:0,stage:defaultStage,companyId:"",contactId:"",leadSource:"",leadSourceCustom:"",closingDate:"",notes:"",...dealFromRow(structuredClone(init)),id:init.id || uid(),_isNew:!init.id,_saveTime:new Date().toISOString()}));
+  const [f,setF]=useState(() => structuredClone(initial));
+  const sessionRef = useRef(null);
+  if (!sessionRef.current) sessionRef.current = createDealSaveSession({id:initial.id,mode:init.id?'edit':'create',base:{...dealToRow(initial),product_interests_revision:initial.productInterestsRevision}});
+  const submitGuard = useRef(false);
+  const closeTimer = useRef(null);
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
   const [submitState,setSubmitState]=useState("idle");
   const [submitMessage,setSubmitMessage]=useState("");
   const s=k=>e=>setF(p=>{
@@ -1136,30 +1143,29 @@ function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
   const sourceOpts=[{v:"",l:t.selectOpt},...LEAD_SOURCES.map(x=>({v:x,l:x}))];
 
   const handleSave = async () => {
-    if(!f.name || submitState === "saving") return;
+    if(!f.name || submitGuard.current) return;
+    submitGuard.current = true;
     setSubmitState("saving");
     setSubmitMessage("Guardando...");
     try {
-      const result = await onSave(f);
-      if(result === false || result?.ok === false){
+      const result = await onSave(f, sessionRef.current, initial);
+      if(result?.ok !== true){
+        submitGuard.current = false;
         setSubmitState("error");
         setSubmitMessage(result?.message || "No se pudo guardar el deal");
         return;
       }
       setSubmitState("saved");
       setSubmitMessage("Deal guardado ✓");
-      setTimeout(()=>{
-        setSubmitState("idle");
-        setSubmitMessage("");
-        onClose();
-      }, 900);
+      closeTimer.current = setTimeout(onClose, 900);
     } catch (e) {
+      submitGuard.current = false;
       setSubmitState("error");
       setSubmitMessage(e?.message || "No se pudo guardar el deal");
     }
   };
 
-  return <>
+  return <fieldset disabled={submitState==="saving" || submitState==="saved"} style={{border:0,padding:0,margin:0,minWidth:0}}>
     <Inp label={t.dealName+" *"} value={f.name} onChange={s("name")} placeholder={t.ph.dealName}/>
     <Inp label={`${t.value} (${currency})`} type="number" value={f.value} onChange={s("value")}/>
     <Sel label={t.stage} value={f.stage} onChange={s("stage")} opts={stOpts}/>
@@ -1171,16 +1177,17 @@ function DlForm({init={},cos,cts,t,lang,currency,stages,onSave,onClose}){
     )}
     <Inp label={t.closingDate} type="date" value={f.closingDate} onChange={s("closingDate")}/>
     <Txta label={t.notes} value={f.notes} onChange={s("notes")}/>
+    <ProductInterestEditor value={f.productInterests} lang={lang} disabled={submitState==="saving" || submitState==="saved"} onChange={value=>setF(p=>({...p,productInterests:value}))}/>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginTop:6}}>
-      <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:submitState==="error"?"#ef4444":submitState==="saved"?"#22c55e":"#64748b",minHeight:16}}>
+      <div role={submitState==="error"?"alert":"status"} style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:submitState==="error"?"#ef4444":submitState==="saved"?"#22c55e":"#64748b",minHeight:16}}>
         {submitMessage}
       </div>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
         <Btn v="ghost" ch={t.cancel} onClick={onClose}/>
-        <Btn ch={submitState==="saving" ? "Guardando..." : t.save} onClick={handleSave}/>
+        <Btn ch={submitState==="saving" ? (lang==='en'?"Saving...":"Guardando...") : t.save} disabled={submitState==="saving" || submitState==="saved"} onClick={handleSave}/>
       </div>
     </div>
-  </>;
+  </fieldset>;
 }
 
 // ─── Import Modal ─────────────────────────────────────────────────────────────
@@ -1271,25 +1278,33 @@ function AppInner(){
     setModal(null);
   };
 
-  const saveDl=async f=>{
-    const base={meddicHistory:[],activities:[],journalEntries:[]};
-    const row = f.id ? {...dls.find(d=>d.id===f.id), ...f} : {...base,...f,id:uid()};
-    const existingDeal = dls.find(d => d.id === row.id);
-    const previousStage = existingDeal?.stage || null;
-    const ok = await withSaveStatus(async()=>{
-      const wonStageNow = activeStages.find((s) => s.name === row.stage)?.isWon || String(row.stage || '').toLowerCase().includes('ganado') || String(row.stage || '').toLowerCase().includes('won');
-      const wonAt = wonStageNow ? (existingDeal?.wonAt || row.wonAt || new Date().toISOString()) : (existingDeal?.wonAt || row.wonAt || null);
-      const effectiveLeadSource = row.pipelineType === 'usa_handover' || activePipelineType === 'usa_handover' ? 'Custom' : (row.leadSource || null);
-      const effectiveLeadSourceCustom = row.pipelineType === 'usa_handover' || activePipelineType === 'usa_handover' ? USA_HANDOVER_SOURCE : (row.leadSourceCustom || null);
-      const res = await supabase.from('deals').upsert([{ id:row.id, name:row.name, value:Number(row.value)||0, stage:row.stage, company_id:row.companyId||null, contact_id:row.contactId||null, closing_date:row.closingDate||null, won_at: wonAt, notes:row.notes||"", lead_source:effectiveLeadSource, lead_source_custom:effectiveLeadSourceCustom }], { onConflict:'id' });
-      ensureSbOk(res, 'save deal');
-    });
-    if(!ok) return { ok:false, message: 'No se pudo guardar el deal' };
-    if(previousStage && previousStage !== row.stage) {
-      await logStageChange(row.id, previousStage, row.stage);
+  const saveDl=async (f, session, initial)=>{
+    const existingDeal = dls.find(d => d.id === f.id);
+    const previousStage = initial._isNew || initial.stage === f.stage ? null : (existingDeal?.stage || initial.stage || null);
+    const row = {...f};
+    const wonStageNow = activeStages.find(s=>s.name===row.stage)?.isWon || /ganado|won/i.test(row.stage || '');
+    row.wonAt = wonStageNow ? (existingDeal?.wonAt || initial.wonAt || initial._saveTime) : initial.wonAt;
+    if (row.pipelineType === 'usa_handover' || activePipelineType === 'usa_handover') {
+      row.leadSource = 'Custom';
+      row.leadSourceCustom = USA_HANDOVER_SOURCE;
     }
-    if(viewDeal&&viewDeal.id===row.id)setViewDeal(p=>({...p,...row}));
-    return { ok:true, id: row.id };
+    setSaveStatus('saving');
+    try {
+      const client = supabase || createLocalDealClient({storage:globalThis.localStorage,initialData:{co:cos,ct:cts,dl:dls,users,currency,stages}});
+      const result = await session.save(client, dealToRow(row));
+      const confirmed = dealFromRow(result.row);
+      setDls(items => items.some(d=>d.id===confirmed.id)
+        ? items.map(d=>d.id===confirmed.id?{...d,...confirmed}:d)
+        : [...items,{meddicHistory:[],activities:[],journalEntries:[],...confirmed}]);
+      if(viewDeal?.id===confirmed.id)setViewDeal(p=>({...p,...confirmed}));
+      if(previousStage && previousStage !== confirmed.stage) await logStageChange(confirmed.id, previousStage, confirmed.stage);
+      setSaveStatus('saved');setSaveMessage(lang==='en'?'Saved':'Guardado');
+      return {ok:true,id:confirmed.id};
+    } catch(error) {
+      const message = error?.message || 'No se pudo guardar el deal';
+      setSaveStatus('error');setSaveMessage(message);
+      return {ok:false,message};
+    }
   };
   const chStage=async(id,stage)=>{
     const currentDeal = dls.find(d=>d.id===id);
@@ -1880,6 +1895,7 @@ function AppInner(){
         <main style={{padding:18,zoom:uiZoom}}>
           {(tab==="deals"||tab==="usa")&&(
             <Kanban
+              lang={lang}
               deals={tab==="usa"?fUsaDl:fDl}
               cos={cos}
               cts={cts}
