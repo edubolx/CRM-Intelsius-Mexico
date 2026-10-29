@@ -25,7 +25,7 @@ export default function ProductInterestEditor({value = [], onChange, lang = 'es'
           <label htmlFor={`product-${row.id}-quantity`} style={{display:'grid',gap:4}}>{label.quantity}
             <input id={`product-${row.id}-quantity`} aria-label={`${label.quantity} ${index+1}`} type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1" placeholder={unknown} value={row.quantity ?? ''} onChange={e=>update(index,'quantity',e.target.value)} style={controlStyle}/>
           </label>
-          {select('periodicity',[['one_time',en?'One-time purchase':'Compra única'],['monthly',en?'Monthly purchase':'Compra mensual']])}
+          {select('periodicity',[['one_time',en?'One-time purchase':'Compra única'],['monthly',en?'Monthly purchase':'Compra mensual'],['rental',en?'Rental':'Renta']])}
         </div>
         <button type="button" aria-label={`${en?'Remove product':'Eliminar producto'} ${index+1}`} onClick={()=>onChange(value.filter((_,i)=>i!==index))} style={{...buttonStyle,color:'#b91c1c',marginTop:8}}>{en?'Remove':'Eliminar'}</button>
       </div>;

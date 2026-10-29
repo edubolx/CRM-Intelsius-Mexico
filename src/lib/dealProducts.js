@@ -24,7 +24,7 @@ export function normalizeProducts(rows = []) {
     const size = optional(row.size), temperature = optional(row.temperature), periodicity = optional(row.periodicity);
     if (size !== null && !c.sizes.includes(size)) fail('tamaño no válido para la línea');
     if (temperature !== null && !c.temperatures.includes(temperature)) fail('temperatura no válida para la línea');
-    if (periodicity !== null && !['one_time','monthly'].includes(periodicity)) fail('periodicidad inválida');
+    if (periodicity !== null && !['one_time','monthly','rental'].includes(periodicity)) fail('periodicidad inválida');
     let quantity = optional(row.quantity);
     if (quantity !== null) {
       if (typeof quantity === 'string' && !/^\d+$/.test(quantity)) fail('cantidad debe ser un entero positivo');

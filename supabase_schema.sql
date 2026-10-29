@@ -374,7 +374,7 @@ BEGIN
     END IF;
     IF product ? 'periodicity' AND product->'periodicity' <> 'null'::jsonb THEN
       IF jsonb_typeof(product->'periodicity') IS DISTINCT FROM 'string'
-         OR NOT ((product->>'periodicity') = ANY(ARRAY['one_time','monthly'])) THEN RETURN false; END IF;
+         OR NOT ((product->>'periodicity') = ANY(ARRAY['one_time','monthly','rental'])) THEN RETURN false; END IF;
     END IF;
   END LOOP;
   RETURN true;
