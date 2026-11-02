@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { supabase } from "../../supabaseClient.js";
 import { childProgress } from "./subtaskModel.js";
 import { createSubtaskRepository, createSubtaskStore } from "./subtaskStore.js";
@@ -90,8 +90,11 @@ function EditableCell({ children, w = 120 }) {
   return <td style={{ padding: 0, borderBottom: "1px solid #eef2f7", width: w, minWidth: w, verticalAlign: "top" }}>{children}</td>;
 }
 
-export default function SpecialTasksView({ users = [], deals = [], search = "" }) {
+export default function SpecialTasksView({ users = [], deals = [], search = "", focusTaskId = null, createOnOpen = false, onClearFocus, lang = "es" }) {
   const [tasks, setTasks] = useState([]);
+  const initialDraft = useRef(null);
+  const taskReadId = useRef(0);
+  const createRequested = useRef(createOnOpen);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savingById, setSavingById] = useState({});
@@ -123,19 +126,27 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
   const dealsById = useMemo(() => new Map(deals.map((d) => [d.id, d])), [deals]);
 
   const loadTasks = async ({ quiet = false } = {}) => {
+    const request = ++taskReadId.current;
     if (!quiet) setLoading(true);
     setError("");
     const { data, error: loadError } = await supabase.from("special_tasks").select("*").order("eisenhower_score", { ascending: false }).order("due_date", { ascending: true });
+    if (request !== taskReadId.current) return;
     if (loadError) {
       setError(loadError.message || "No se pudieron cargar las tareas especiales.");
       setTasks([]);
     } else {
-      setTasks((data || []).map(rowToTask));
+      const loaded = (data || []).map(rowToTask);
+      if (createRequested.current) {
+        initialDraft.current = newTask();
+        createRequested.current = false;
+      }
+      setTasks(initialDraft.current ? [initialDraft.current, ...loaded] : loaded);
+      initialDraft.current = null;
     }
     if (!quiet) setLoading(false);
   };
 
-  useEffect(() => { loadTasks(); }, []);
+  useEffect(() => { loadTasks(); return () => { ++taskReadId.current; }; }, []);
 
   useEffect(() => {
     if (!supabase) return undefined;
@@ -145,6 +156,10 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  useEffect(() => {
+    if (focusTaskId && !loading) document.getElementById(`special-task-${focusTaskId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focusTaskId, loading]);
 
   const updateLocal = (id, patch) => setTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...patch } : task));
 
@@ -170,7 +185,11 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
     await saveTask(next);
   };
 
-  const addInlineRow = () => setTasks((prev) => [newTask(), ...prev]);
+  const addInlineRow = () => {
+    onClearFocus?.();
+    setFilters({ ownerId: "", status: "", quadrant: "", dealId: "", due: "" });
+    setTasks((prev) => [newTask(), ...prev]);
+  };
 
   const deleteTask = async (task) => {
     if (task.isNew && !task.title.trim()) {
@@ -195,6 +214,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
     const today = new Date().toISOString().slice(0, 10);
     return tasks
       .filter((task) => {
+        if (focusTaskId) return task.id === focusTaskId;
         const haystack = [task.title, task.description, task.comments, usersById.get(task.ownerId)?.name, dealsById.get(task.dealId)?.name].join(" ").toLowerCase();
         if (q && !haystack.includes(q)) return false;
         if (filters.ownerId && task.ownerId !== filters.ownerId) return false;
@@ -214,7 +234,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
         if (urgencyDiff) return urgencyDiff;
         return String(a.dueDate || "9999-12-31").localeCompare(String(b.dueDate || "9999-12-31"));
       });
-  }, [tasks, search, filters, usersById, dealsById]);
+  }, [tasks, search, filters, usersById, dealsById, focusTaskId]);
 
   const summary = QUADRANTS.map((q) => ({ ...q, count: filteredTasks.filter((task) => quadrantFor(task) === q.key).length }));
 
@@ -228,6 +248,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
         <button onClick={addInlineRow} style={{ background: "#003e7e", color: "#fff", border: "1px solid #003e7e", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontWeight: 600 }}>+ Nueva fila</button>
       </div>
 
+      {focusTaskId && <div role="status" style={{ color: "#003e7e", fontSize: 12 }}>ID: {focusTaskId} · <button onClick={onClearFocus}>{lang === "en" ? "Show all" : "Ver todas"}</button>{!loading && !tasks.some(task => task.id === focusTaskId) && (lang === "en" ? " · Task not found" : " · Tarea no encontrada")}</div>}
       {error && <div style={{ background: "#fde8e8", color: "#9a3535", border: "1px solid #d4a0a0", borderRadius: 12, padding: 12, fontSize: 12 }}>⚠️ {error}</div>}
       {subtasks.error && <div role="alert" style={{ background: "#fde8e8", color: "#9a3535", borderRadius: 12, padding: 12, fontSize: 12 }}>No se pudieron actualizar las subtareas: {subtasks.error} <button type="button" onClick={() => subtaskStore.load()}>Reintentar carga</button></div>}
       {subtasks.loading && <div role="status" style={{ color: "#64748b", fontSize: 12 }}>Cargando subtareas…</div>}
@@ -262,7 +283,7 @@ export default function SpecialTasksView({ users = [], deals = [], search = "" }
                   const cellInput = { ...inputStyle, color: isDone ? "#64748b" : "#0f172a" };
                   return (
                     <Fragment key={task.id}>
-                    <tr style={{ background: isDone ? "#f1f5f9" : task.isNew ? "#f8fafc" : "#fff", opacity: isDone ? .78 : 1 }}>
+                    <tr id={`special-task-${task.id}`} data-special-task-id={task.id} style={{ outline: focusTaskId === task.id ? "2px solid #27aae1" : undefined, outlineOffset: -2, background: isDone ? "#f1f5f9" : task.isNew ? "#f8fafc" : "#fff", opacity: isDone ? .78 : 1 }}>
                       <EditableCell w={720}><div style={{ display: "flex", alignItems: "center", paddingLeft: 3 }}><SubtaskControls task={task} expanded={!!expandedById[task.id]} progress={childProgress(subtasks.rows, task.id)} onToggle={() => setExpandedById((previous) => ({ ...previous, [task.id]: !previous[task.id] }))} /><input value={task.title} title={task.title || ""} placeholder="Nueva tarea..." onChange={(e) => updateLocal(task.id, { title: e.target.value })} onBlur={(e) => patchAndSave(task.id, { title: e.target.value })} style={{ ...cellInput, minWidth: 0, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: isDone ? "line-through" : "none" }} /></div></EditableCell>
                       <EditableCell w={165}><select value={task.ownerId || ""} onChange={(e) => patchAndSave(task.id, { ownerId: e.target.value })} style={cellInput}><option value="">—</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name || u.alias || u.email}</option>)}</select></EditableCell>
                       <EditableCell w={72}><select value={task.importanceScore} onChange={(e) => patchAndSave(task.id, { importanceScore: Number(e.target.value) })} style={cellInput}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}</select></EditableCell>

@@ -1,10 +1,16 @@
 import { useState } from "react";
 import ActivitiesPanel from "../activities/ActivitiesPanel.jsx";
+import LinkedSpecialTasks from "../agenda/LinkedSpecialTasks.jsx";
 import DealJournalPanel from "./DealJournalPanel.jsx";
 import ProductInterestSummary from "./ProductInterestSummary.jsx";
 
 export default function DealDetailModal({
   deal,
+  initialTab,
+  focusActivityId,
+  linkedTaskRows,
+  agendaSource,
+  onOpenSpecialTask,
   cos,
   cts,
   users,
@@ -44,7 +50,7 @@ export default function DealDetailModal({
     iSx,
   } = helpers;
 
-  const [tab, setTab] = useState(deal._openTab || "meddic");
+  const [tab, setTab] = useState(initialTab || deal._openTab || "meddic");
   const co = cos.find((c) => c.id === deal.companyId);
   const ct = cts.find((c) => c.id === deal.contactId);
   const m = stageStyle(stages, deal.stage);
@@ -93,8 +99,10 @@ export default function DealDetailModal({
         </div>
       )}
       {tab === "activities" && (
+        <>
         <ActivitiesPanel
           deal={deal}
+          focusActivityId={focusActivityId}
           t={t}
           users={users}
           onAddActivity={onAddActivity}
@@ -103,6 +111,8 @@ export default function DealDetailModal({
           onUpdateActivity={onUpdateActivity}
           helpers={{ today, uid, ACTIVITY_TYPES, ACTIVITY_STATUSES, Sel, Inp, Txta, Btn, Ic, iSx }}
         />
+        <LinkedSpecialTasks rows={linkedTaskRows} dealId={deal.id} lang={lang} source={agendaSource} onEdit={onOpenSpecialTask} onRetry={agendaSource?.retry} />
+        </>
       )}
       {tab === "journal" && (
         <DealJournalPanel

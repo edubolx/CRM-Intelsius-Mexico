@@ -17,6 +17,9 @@ import ProspectingContactForm from './components/prospecting/ProspectingContactF
 import ProspectingActivityForm from './components/prospecting/ProspectingActivityForm.jsx'
 import ProjectionsView from './components/projections/ProjectionsView.jsx'
 import SpecialTasksView from './components/special-tasks/SpecialTasksView.jsx'
+import AgendaView from './components/agenda/AgendaView.jsx'
+import { buildAgenda } from './components/agenda/agendaModel.js'
+import { useAgendaSources } from './components/agenda/useAgendaSources.js'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -1210,6 +1213,20 @@ function AppInner(){
   const[q,setQ]=useState("");
   const[modal,setModal]=useState(null);
   const[viewDeal,setViewDeal]=useState(null);
+  const [taskRoute, setTaskRoute] = useState({ focusId: null, create: false });
+  const [agendaState, setAgendaState] = useState({ view: 'pending', filters: {}, expanded: {} });
+  const agendaSource = useAgendaSources(supabase, tab === 'agenda' || Boolean(viewDeal));
+  const agendaRows = useMemo(() => buildAgenda({ tasks: agendaSource.tasks, children: agendaSource.children, deals: dls, users }), [agendaSource.tasks, agendaSource.children, dls, users]);
+  const openSpecialTask = (id, create = false) => {
+    setViewDeal(null);
+    setTaskRoute({ focusId: id, create });
+    if (create) setQ('');
+    setTab('specialTasks');
+  };
+  const openAgendaActivity = (dealId, activityId = null) => {
+    const deal = dls.find(item => item.id === dealId);
+    if (deal) setViewDeal({ ...deal, _openTab: 'activities', _focusActivityId: activityId });
+  };
   const[confirmDel,setConfirmDel]=useState(null);
 
   // ── CRUD operations ──
@@ -1795,7 +1812,7 @@ function AppInner(){
   const fUsaDl=useMemo(()=>dls.filter(d=>isUsaHandoverDeal(d) && d.name.toLowerCase().includes(ql)),[dls,ql]);
   const fUs=useMemo(()=>users.filter(u=>u.name.toLowerCase().includes(ql)||u.alias?.toLowerCase().includes(ql)||u.email?.toLowerCase().includes(ql)),[users,ql]);
 
-  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"usa",l:"USA Handover",i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"projections",l:t.projections,i:"chart"},{k:"specialTasks",l:"Tareas especiales",i:"meddic"},{k:"activities",l:t.activities,i:"history"},{k:"users",l:t.usersTab,i:"users"}];
+  const TABS=[{k:"deals",l:t.pipeline,i:"layers"},{k:"usa",l:"USA Handover",i:"layers"},{k:"companies",l:t.companies,i:"building"},{k:"contacts",l:t.contacts,i:"users"},{k:"prospecting",l:lang==="es"?"Prospección":"Prospecting",i:"search"},{k:"projections",l:t.projections,i:"chart"},{k:"agenda",l:"Agenda",i:"history"},{k:"users",l:t.usersTab,i:"users"}];
   const addL=(tab==="deals"||tab==="usa")?t.newDeal:tab==="companies"?t.newCompany:tab==="contacts"?t.newContact:tab==="users"?t.newUser:null;
   const addT=(tab==="deals"||tab==="usa")?"deal":tab==="companies"?"company":tab==="contacts"?"contact":tab==="users"?"user":null;
 
@@ -1866,7 +1883,7 @@ function AppInner(){
 
         {/* Tabs */}
         <nav style={{background:"#ffffff",borderBottom:"1px solid #cbd5e1",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
-          <div style={{display:"flex",gap:2}}>
+          <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
             {TABS.map(tb=>(
               <button key={tb.k} onClick={()=>setTab(tb.k)}
                 style={{background:"none",border:"none",borderBottom:`2px solid ${tab===tb.k?"#003e7e":"transparent"}`,padding:"10px 15px",color:tab===tb.k?"#27aae1":"#64748b",fontFamily:"inherit",fontSize:13,fontWeight:tab===tb.k?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"color .12s"}}>
@@ -1942,11 +1959,25 @@ function AppInner(){
               currency={currency}
             />
           )}
+          {tab==="agenda" && !viewDeal && (
+            <AgendaView rows={agendaRows} today={today()} lang={lang} deals={dls} source={agendaSource} onRetry={agendaSource.retry}
+              state={{ ...agendaState, filters: { ...agendaState.filters, search: q } }}
+              onStateChange={next => { setQ(next.filters.search || ''); setAgendaState(next); }}
+              onEdit={row => row.source === 'special_task' ? openSpecialTask(row.id) : openAgendaActivity(row.dealId, row.id)}
+              onOpenDeal={id => { const deal = dls.find(item => item.id === id); if (deal) setViewDeal({ ...deal }); }}
+              onNewTask={() => openSpecialTask(null, true)} onNewActivity={id => openAgendaActivity(id)}
+              onLegacy={legacy => { setTaskRoute({ focusId: null, create: false }); setTab(legacy); }} />
+          )}
+          {(tab==="specialTasks" || tab==="activities") && <button onClick={() => setTab('agenda')} style={{ background: '#fff', color: '#003e7e', border: '1px solid #cbd5e1', borderRadius: 8, padding: '9px 14px', marginBottom: 14, cursor: 'pointer' }}>← Agenda</button>}
           {tab==="specialTasks"&&(
             <SpecialTasksView
               users={users}
               deals={dls}
-              search={q}
+              search={taskRoute.focusId ? "" : q}
+              lang={lang}
+              focusTaskId={taskRoute.focusId}
+              createOnOpen={taskRoute.create}
+              onClearFocus={() => { setQ(''); setTaskRoute({ focusId: null, create: false }); }}
             />
           )}
           {tab==="activities"&&(
@@ -1984,6 +2015,12 @@ function AppInner(){
       {/* Deal Detail / MEDDIC modal */}
       {viewDeal&&(
         <DealDetailModal
+          key={`${viewDeal.id}:${viewDeal._openTab || "meddic"}:${viewDeal._focusActivityId || ""}`}
+          linkedTaskRows={agendaRows}
+          agendaSource={agendaSource}
+          onOpenSpecialTask={id => openSpecialTask(id)}
+          initialTab={viewDeal._openTab}
+          focusActivityId={viewDeal._focusActivityId}
           deal={(dls.find(x=>x.id===viewDeal.id) || viewDeal)}
           cos={cos} cts={cts} users={users} lang={lang} currency={currency} stages={isUsaHandoverDeal(viewDeal)?usaStages:mexicoStages} t={t}
           onSaveEval={ev=>saveEval(viewDeal.id,ev)}

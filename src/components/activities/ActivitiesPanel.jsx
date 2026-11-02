@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function ActivitiesPanel({
   deal,
+  focusActivityId,
   t,
   users,
   onAddActivity,
@@ -21,11 +22,16 @@ export default function ActivitiesPanel({
   const makeEmptyForm = () => ({ type: "task", title: "", dueDate: today(), responsible: "", status: "pending", comment: "", importanceScore: "", urgencyScore: "" });
   const [form, setForm] = useState(makeEmptyForm);
   const [editingId, setEditingId] = useState(null);
+  const openedActivity = useRef(null);
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState("");
   const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const typeOpts = ACTIVITY_TYPES.map((v) => ({ v, l: t[v] }));
+  // Historical `email` and `emailType` share a label, never a stored value.
+  if (form.type && !typeOpts.some(option => option.v === form.type)) {
+    typeOpts.push({ v: form.type, l: form.type === 'email' ? (t.emailType || t.email || 'Email') : (t[form.type] || form.type) });
+  }
   const statusOpts = ACTIVITY_STATUSES.map((v) => ({ v, l: t[v] }));
 
   const resetForm = () => {
@@ -74,7 +80,7 @@ export default function ActivitiesPanel({
     setForm({
       type: a.type || "task",
       title: a.title || "",
-      dueDate: a.dueDate || today(),
+      dueDate: a.dueDate || "",
       responsible: a.responsible || "",
       status: a.status || "pending",
       comment: a.comment || "",
@@ -82,6 +88,12 @@ export default function ActivitiesPanel({
       urgencyScore: a.urgencyScore == null ? "" : String(a.urgencyScore),
     });
   };
+
+  useEffect(() => {
+    if (!focusActivityId || openedActivity.current === focusActivityId) return;
+    const activity = (deal.activities || []).find(activity => activity.id === focusActivityId);
+    if (activity) { startEdit(activity); openedActivity.current = focusActivityId; }
+  }, [focusActivityId, deal.activities]);
 
   return (
     <div>
