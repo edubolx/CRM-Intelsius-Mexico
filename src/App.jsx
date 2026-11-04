@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore, memo } from "react";
 import Papa from "papaparse";
 import { supabase } from './supabaseClient.js'
 import { CRMProvider, useCRM } from './state/CRMContext.jsx'
-import ActivitiesPanel from './components/activities/ActivitiesPanel.jsx'
-import ActivitiesDashboard from './components/activities/ActivitiesDashboard.jsx'
 import DealDetailModal from './components/deals/DealDetailModal.jsx'
 import ProductInterestEditor from './components/deals/ProductInterestEditor.jsx'
 import { dealFromRow, dealToRow } from './lib/dealModel.js'
@@ -16,9 +14,14 @@ import ProspectingCompanyForm from './components/prospecting/ProspectingCompanyF
 import ProspectingContactForm from './components/prospecting/ProspectingContactForm.jsx'
 import ProspectingActivityForm from './components/prospecting/ProspectingActivityForm.jsx'
 import ProjectionsView from './components/projections/ProjectionsView.jsx'
-import SpecialTasksView from './components/special-tasks/SpecialTasksView.jsx'
 import AgendaView from './components/agenda/AgendaView.jsx'
-import { buildAgenda } from './components/agenda/agendaModel.js'
+import AgendaEditor from './components/agenda/AgendaEditor.jsx'
+import { createAgendaController } from './components/agenda/agendaController.js'
+import { createAgendaRepository } from './components/agenda/agendaRepository.js'
+import { createSubtaskRepository, createSubtaskStore } from './components/special-tasks/subtaskStore.js'
+import { SubtaskPanel } from './components/special-tasks/SubtaskPanel.jsx'
+import { SUBTASK_STATUSES } from './components/special-tasks/subtaskModel.js'
+import { buildAgenda, persistedAgendaChildren } from './components/agenda/agendaModel.js'
 import { useAgendaSources } from './components/agenda/useAgendaSources.js'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
@@ -458,6 +461,7 @@ async function supabaseLoad() {
           title: a.title,
           dueDate: a.due_date,
           responsible: a.responsible,
+          nativeRow: a,
           status: a.status,
           comment: a.comment || "",
           importanceScore: a.importance_score ?? null,
@@ -517,31 +521,7 @@ async function supabaseSaveAll({ cos, cts, dls, stages, users }) {
         await supabase.from('meddic_evals').delete().in('id', staleIds);
       }
 
-      // Upsert + sync deletes for deal activities (if table exists)
-      try {
-        const allActivities = dls.flatMap(d =>
-          (d.activities || []).map(a => ({
-            id: a.id,
-            deal_id: d.id,
-            type: a.type,
-            title: a.title,
-            due_date: a.dueDate || null,
-            responsible: a.responsible || "",
-            status: a.status || "pending",
-            comment: a.comment || "",
-            importance_score: a.importanceScore ?? null,
-            urgency_score: a.urgencyScore ?? null,
-            eisenhower_score: a.eisenhowerScore ?? ((a.importanceScore != null && a.urgencyScore != null) ? Number(a.importanceScore || 0) + Number(a.urgencyScore || 0) : null),
-            created_at: a.createdAt || null,
-          }))
-        );
-        if (allActivities.length > 0) {
-          await supabase.from('deal_activities').upsert(allActivities, { onConflict: 'id' });
-        }
-        // NOTE: avoid auto-deleting "stale" activities from snapshots,
-        // because concurrent tabs/sessions can cause accidental removals.
-        // Activity deletes are handled explicitly when user clicks delete.
-      } catch {}
+      // Agenda owns source-qualified activity writes; snapshots never rewrite activity arrays.
     }
     // Upsert users (best-effort so it never blocks deal/contact saves)
     if ((users || []).length > 0) {
@@ -1213,20 +1193,28 @@ function AppInner(){
   const[q,setQ]=useState("");
   const[modal,setModal]=useState(null);
   const[viewDeal,setViewDeal]=useState(null);
-  const [taskRoute, setTaskRoute] = useState({ focusId: null, create: false });
   const [agendaState, setAgendaState] = useState({ view: 'pending', filters: {}, expanded: {} });
   const agendaSource = useAgendaSources(supabase, tab === 'agenda' || Boolean(viewDeal));
-  const agendaRows = useMemo(() => buildAgenda({ tasks: agendaSource.tasks, children: agendaSource.children, deals: dls, users }), [agendaSource.tasks, agendaSource.children, dls, users]);
-  const openSpecialTask = (id, create = false) => {
-    setViewDeal(null);
-    setTaskRoute({ focusId: id, create });
-    if (create) setQ('');
-    setTab('specialTasks');
+  const [subtaskStore] = useState(() => createSubtaskStore(createSubtaskRepository(supabase)));
+  const subtasks = useSyncExternalStore(subtaskStore.subscribe, subtaskStore.getSnapshot);
+  useEffect(() => { if (tab === 'agenda' || viewDeal) subtaskStore.load(); }, [subtaskStore, agendaSource.children, tab, Boolean(viewDeal)]);
+  const agendaRows = useMemo(() => buildAgenda({ tasks: agendaSource.tasks, children: subtasks.loading ? agendaSource.children : persistedAgendaChildren(subtasks.rows), deals: dls, users }), [agendaSource.tasks, agendaSource.children, subtasks.rows, subtasks.loading, dls, users]);
+  const [agendaController] = useState(() => createAgendaController(createAgendaRepository(supabase), (source, row, removed) => {
+    if (source === 'special_task') { agendaSource.accept(row, removed); return; }
+    const activity = { id: row.id, type: row.type, title: row.title, dueDate: row.due_date, responsible: row.responsible, status: row.status, comment: row.comment, importanceScore: row.importance_score, urgencyScore: row.urgency_score, eisenhowerScore: row.eisenhower_score ?? (row.importance_score != null && row.urgency_score != null ? Number(row.importance_score)+Number(row.urgency_score) : null), createdAt: row.created_at, updatedAt: row.updated_at, nativeRow: row };
+    setDls(previous => previous.map(deal => {
+      const rest = (deal.activities || []).filter(item => item.id !== row.id);
+      return {...deal, activities: !removed && deal.id === row.deal_id ? [...rest, activity] : rest};
+    }));
+  }));
+  const agendaEditor = useSyncExternalStore(agendaController.subscribe, agendaController.getSnapshot);
+  const openAgendaRow = (row, mode = 'inline', context = 'agenda') => agendaController.open({source: row.source, id: row.id, base: row.nativeRow, mode, context, childCount: row.children.length});
+  const openSpecialTask = id => {
+    const row = agendaRows.find(item => item.source === 'special_task' && item.id === id);
+    if (!row || agendaEditor.session) return;
+    setViewDeal(null); setTab('agenda'); openAgendaRow(row, 'details');
   };
-  const openAgendaActivity = (dealId, activityId = null) => {
-    const deal = dls.find(item => item.id === dealId);
-    if (deal) setViewDeal({ ...deal, _openTab: 'activities', _focusActivityId: activityId });
-  };
+  const renderAgendaEditor = () => <AgendaEditor snapshot={agendaEditor} controller={agendaController} users={users} deals={dls} lang={lang} />;
   const[confirmDel,setConfirmDel]=useState(null);
 
   // ── CRUD operations ──
@@ -1567,122 +1555,6 @@ function AppInner(){
     return true;
   };
 
-  const addActivity=async(dealId, activity)=>{
-    const row = {
-      ...activity,
-      id: activity.id || uid(),
-      createdAt: activity.createdAt || new Date().toISOString(),
-      updatedAt: activity.updatedAt || new Date().toISOString(),
-      completedAt: activity.status === "done" ? (activity.completedAt || new Date().toISOString()) : (activity.completedAt || null),
-    };
-    const ok = await withSaveStatus(async()=>{
-      const payload = {
-        id: row.id,
-        deal_id: dealId,
-        type: row.type,
-        title: row.title,
-        due_date: row.dueDate || null,
-        responsible: row.responsible || null,
-        status: row.status || "pending",
-        comment: row.comment || null,
-        importance_score: row.importanceScore,
-        urgency_score: row.urgencyScore,
-        eisenhower_score: row.eisenhowerScore,
-      };
-      const res = await supabase.from('deal_activities').insert([payload]);
-      ensureSbOk(res, 'add deal activity');
-    });
-    if(!ok) return false;
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:dedupeById([...(d.activities||[]), row])}:d));
-    setViewDeal(p=>{
-      if(!p || p.id!==dealId) return p;
-      return {...p,activities:dedupeById([...(p.activities||[]), row])};
-    });
-    return true;
-  };
-  const deleteActivity=async(dealId, activityId)=>{
-    const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deal_activities').delete().eq('id', activityId);
-      ensureSbOk(res, 'delete deal activity');
-    });
-    if(!ok) return;
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).filter(a=>a.id!==activityId)}:d));
-    setViewDeal(p=>{
-      if(!p || p.id!==dealId) return p;
-      const currentActivities = Array.isArray(p.activities) ? p.activities : [];
-      return {...p,activities:currentActivities.filter(a=>a.id!==activityId)};
-    });
-  };
-  const updateActivityStatus=async(dealId, activityId, status)=>{
-    const nowIso = new Date().toISOString();
-    const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
-    const completedAt = status === "done" ? ((current && current.completedAt) || nowIso) : null;
-    const previousStatus = current?.status;
-
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>{
-      if(a.id!==activityId) return a;
-      return { ...a, status, completedAt, updatedAt: nowIso };
-    })}:d));
-    setViewDeal(p=>{
-      if(!p || p.id!==dealId) return p;
-      const currentActivities = Array.isArray(p.activities) ? p.activities : [];
-      return {...p,activities:currentActivities.map(a=>{
-        if(a.id!==activityId) return a;
-        return { ...a, status, completedAt, updatedAt: nowIso };
-      })};
-    });
-
-    const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deal_activities').update({ status }).eq('id', activityId).select('id,status').single();
-      ensureSbOk(res, 'update deal activity status');
-      if(res.data?.status !== status) throw new Error('Status not confirmed by database');
-    });
-    if(!ok) {
-      setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?{...a,status:previousStatus ?? a.status,updatedAt:a.updatedAt}:a)}:d));
-      setViewDeal(p=>{
-        if(!p || p.id!==dealId) return p;
-        const currentActivities = Array.isArray(p.activities) ? p.activities : [];
-        return {...p,activities:currentActivities.map(a=>a.id===activityId?{...a,status:previousStatus ?? a.status,updatedAt:a.updatedAt}:a)};
-      });
-      await reloadFromSupabase();
-      return false;
-    }
-    await reloadFromSupabase();
-    return true;
-  };
-
-  const updateActivity=async(dealId, activityId, patch)=>{
-    const current = (dls.find(d=>d.id===dealId)?.activities || []).find(a=>a.id===activityId);
-    if(!current) return false;
-    const nowIso = new Date().toISOString();
-    const completedAt = (patch.status || current.status) === "done"
-      ? (current.completedAt || nowIso)
-      : ((patch.status || current.status) === "done" ? nowIso : null);
-    const next = { ...current, ...patch, updatedAt: nowIso, completedAt };
-    const ok = await withSaveStatus(async()=>{
-      const res = await supabase.from('deal_activities').update({
-        type: next.type,
-        title: next.title,
-        due_date: next.dueDate || null,
-        responsible: next.responsible || null,
-        status: next.status || "pending",
-        comment: next.comment || null,
-        importance_score: next.importanceScore,
-        urgency_score: next.urgencyScore,
-        eisenhower_score: next.eisenhowerScore,
-      }).eq('id', activityId);
-      ensureSbOk(res, 'update deal activity');
-    });
-    if(!ok) return false;
-    setDls(p=>p.map(d=>d.id===dealId?{...d,activities:(d.activities||[]).map(a=>a.id===activityId?next:a)}:d));
-    setViewDeal(p=>{
-      if(!p || p.id!==dealId) return p;
-      const currentActivities = Array.isArray(p.activities) ? p.activities : [];
-      return {...p,activities:currentActivities.map(a=>a.id===activityId?next:a)};
-    });
-    return true;
-  };
-
   const addDealJournalEntryLocal = (dealId, entry) => {
     setDls(p=>p.map(d=>d.id===dealId?{...d,journalEntries:dedupeById([...(d.journalEntries||[]), entry])}:d));
     setViewDeal(p=>{
@@ -1768,12 +1640,6 @@ function AppInner(){
     if(!ok) return false;
     addDealJournalEntryLocal(dealId, row);
     return true;
-  };
-
-  const openDealActivities=(dealId)=>{
-    const d = dls.find(x=>x.id===dealId);
-    if(!d) return;
-    setViewDeal({...d, _openTab:"activities"});
   };
 
   const importCos=async(rows)=>{
@@ -1959,34 +1825,16 @@ function AppInner(){
               currency={currency}
             />
           )}
-          {tab==="agenda" && !viewDeal && (
+          {tab==="agenda" && (
             <AgendaView rows={agendaRows} today={today()} lang={lang} deals={dls} source={agendaSource} onRetry={agendaSource.retry}
               state={{ ...agendaState, filters: { ...agendaState.filters, search: q } }}
               onStateChange={next => { setQ(next.filters.search || ''); setAgendaState(next); }}
-              onEdit={row => row.source === 'special_task' ? openSpecialTask(row.id) : openAgendaActivity(row.dealId, row.id)}
+              editor={!viewDeal || agendaEditor.context === 'agenda' ? agendaEditor : null} renderEditor={renderAgendaEditor}
+              onEdit={row => openAgendaRow(row)} onDelete={row => openAgendaRow(row, 'delete')}
               onOpenDeal={id => { const deal = dls.find(item => item.id === id); if (deal) setViewDeal({ ...deal }); }}
-              onNewTask={() => openSpecialTask(null, true)} onNewActivity={id => openAgendaActivity(id)}
-              onLegacy={legacy => { setTaskRoute({ focusId: null, create: false }); setTab(legacy); }} />
-          )}
-          {(tab==="specialTasks" || tab==="activities") && <button onClick={() => setTab('agenda')} style={{ background: '#fff', color: '#003e7e', border: '1px solid #cbd5e1', borderRadius: 8, padding: '9px 14px', marginBottom: 14, cursor: 'pointer' }}>← Agenda</button>}
-          {tab==="specialTasks"&&(
-            <SpecialTasksView
-              users={users}
-              deals={dls}
-              search={taskRoute.focusId ? "" : q}
-              lang={lang}
-              focusTaskId={taskRoute.focusId}
-              createOnOpen={taskRoute.create}
-              onClearFocus={() => { setQ(''); setTaskRoute({ focusId: null, create: false }); }}
-            />
-          )}
-          {tab==="activities"&&(
-            <ActivitiesDashboard
-              dls={dls}
-              t={t}
-              onUpdateActivityStatus={updateActivityStatus}
-              onOpenActivity={openDealActivities}
-              helpers={{ today, startOfWeek, ACTIVITY_STATUSES, Sel, iSx }}
+              onNewTask={() => agendaController.open({source:'special_task', id:uid(), context:'agenda'})}
+              onNewActivity={id => agendaController.open({source:'deal_activity', id:uid(), dealId:id, context:'agenda'})}
+              renderSubtasks={row => <div className="agenda-subtasks"><table><tbody><SubtaskPanel task={{id:row.id, title:row.title, ownerId:row.nativeRow.owner_id}} rows={subtasks.rows} users={users} statuses={SUBTASK_STATUSES.map(value=>({value,label:T[lang][value] || value}))} store={subtaskStore} onAdd={title => { const id=uid(); subtaskStore.add({id:row.id,ownerId:row.nativeRow.owner_id},id); subtaskStore.edit(row.id,id,{title}); subtaskStore.save(row.id,id); }} /></tbody></table>{subtasks.error && <p role="alert">{subtasks.error}<button onClick={()=>subtaskStore.load()}>Reintentar</button></p>}</div>}
             />
           )}
           {tab==="users"&&(
@@ -2025,10 +1873,9 @@ function AppInner(){
           cos={cos} cts={cts} users={users} lang={lang} currency={currency} stages={isUsaHandoverDeal(viewDeal)?usaStages:mexicoStages} t={t}
           onSaveEval={ev=>saveEval(viewDeal.id,ev)}
           onDeleteEval={evalId=>deleteEval(viewDeal.id,evalId)}
-          onAddActivity={activity=>addActivity(viewDeal.id,activity)}
-          onDeleteActivity={activityId=>deleteActivity(viewDeal.id,activityId)}
-          onUpdateActivityStatus={(activityId,status)=>updateActivityStatus(viewDeal.id,activityId,status)}
-          onUpdateActivity={(activityId,patch)=>updateActivity(viewDeal.id,activityId,patch)}
+          agendaDeals={dls}
+          agendaController={agendaController}
+          agendaEditor={agendaEditor}
           onEditDeal={()=>{setModal({type:"deal",data:(dls.find(x=>x.id===viewDeal.id) || viewDeal)});setViewDeal(null);}}
           onAddJournalEntry={(entry)=>addManualJournalEntry(viewDeal.id, entry)}
           onDeleteJournalEntry={(entryId)=>deleteManualJournalEntry(viewDeal.id, entryId)}

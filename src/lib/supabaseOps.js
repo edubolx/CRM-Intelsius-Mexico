@@ -73,6 +73,7 @@ export async function supabaseLoad({ supabase, DEFAULT_STAGES }) {
             title: a.title,
             dueDate: a.due_date,
             responsible: a.responsible,
+            nativeRow: a,
             status: a.status,
             comment: a.comment || "",
             importanceScore: a.importance_score ?? null,

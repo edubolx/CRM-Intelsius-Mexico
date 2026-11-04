@@ -75,22 +75,23 @@ test('visible conflict retry explicitly authorizes saving but title blur does no
   assert.deepEqual(calls, [['p', 'c'], ['p', 'c', { retry: true }]]);
 });
 
-test('composer is wired to one explicitly titled draft and save within the parent dropdown', async () => {
-  const source = await readFile(new URL('../src/components/special-tasks/SpecialTasksView.jsx', import.meta.url), 'utf8');
-  assert.match(source, /onAdd=\{\(title\) => addSubtask\(task, title\)\}/);
-  assert.match(source, /subtaskStore\.edit\(task\.id, childId, \{ title \}\)/);
-  assert.match(source, /subtaskStore\.save\(task\.id, childId\)/);
-  assert.match(source, /display: "flex", alignItems: "center".*<SubtaskControls/);
+test('Agenda composer wires a single titled draft and explicit save to the selected parent', async () => {
+  const source = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  assert.match(source, /<SubtaskPanel/);
+  assert.match(source, /subtaskStore\.add\(\{id:row\.id,ownerId:row\.nativeRow\.owner_id\},id\)/);
+  assert.match(source, /subtaskStore\.edit\(row\.id,id,\{title\}\)/);
+  assert.match(source, /subtaskStore\.save\(row\.id,id\)/);
 });
 
-test('parent summary/filter pipeline stays separate; children load even when collapsed and realtime cleans up', async () => {
-  const source = await readFile(new URL('../src/components/special-tasks/SpecialTasksView.jsx', import.meta.url), 'utf8');
-  assert.match(source, /return tasks\s*\.filter/);
-  assert.match(source, /count: filteredTasks\.filter/);
-  assert.match(source, /filteredTasks\.map/);
-  assert.match(source, /subtaskStore\.load\(\)/);
-  assert.match(source, /table: "special_task_subtasks"/);
-  assert.match(source, /supabase\.removeChannel\(childChannel\)/);
-  assert.match(source, /childProgress\(subtasks\.rows, task\.id\)/);
-  assert.match(source, /subtareas.*eliminarán|eliminarán.*subtareas/);
+test('Agenda source independently loads/reconciles children even when collapsed; root counters stay separate', async () => {
+  const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  const reader = await readFile(new URL('../src/components/agenda/agendaSources.js', import.meta.url), 'utf8');
+  const model = await readFile(new URL('../src/components/agenda/agendaModel.js', import.meta.url), 'utf8');
+  const editor = await readFile(new URL('../src/components/agenda/AgendaEditor.jsx', import.meta.url), 'utf8');
+  assert.match(app, /subtaskStore\.load\(\)/);
+  assert.match(app, /persistedAgendaChildren\(subtasks\.rows\)/);
+  assert.match(reader, /table: "special_task_subtasks"/);
+  assert.match(reader, /client\.removeChannel\(channel\)/);
+  assert.match(model, /for \(const row of pending\) counts/);
+  assert.match(editor, /eliminarán también sus subtareas/);
 });

@@ -35,7 +35,7 @@ const TEXT = {
     state: "Estado",
     score: "Prioridad",
     unknown: "Sin prioridad",
-    edit: "Abrir editor original",
+    edit: "Editar en Agenda",
     special: "Tarea especial",
     activity: "Actividad",
     new: "+ Nuevo",
@@ -69,7 +69,7 @@ const TEXT = {
     state: "Status",
     score: "Priority",
     unknown: "No priority",
-    edit: "Open source editor",
+    edit: "Edit in Agenda",
     special: "Special task",
     activity: "Activity",
     new: "+ New",
@@ -87,7 +87,10 @@ export default function AgendaView({
   onOpenDeal,
   onNewTask,
   onNewActivity,
-  onLegacy,
+  onDelete,
+  editor,
+  renderEditor = () => null,
+  renderSubtasks = () => null,
   deals = [],
   source,
   onRetry,
@@ -99,6 +102,7 @@ export default function AgendaView({
   const filter = (key, value) =>
     change({ filters: { ...filters, [key]: value } });
   const result = selectAgenda(rows, filters, today);
+  const totalsIncomplete = !!(source?.loading || source?.error);
   const owners = [
     ...new Map(
       rows.map((row) => [row.ownerKey, row.ownerLabel || t.unassigned]),
@@ -132,9 +136,9 @@ export default function AgendaView({
           {row.source === "special_task" && (
             <button
               className="agenda-disclosure"
-              aria-label={`${language === "en" ? "Subtasks" : "Subtareas"}: ${row.title}`}
+              aria-label={`${language === "en" ? "Subtasks" : "Subtareas"}: ${row.title}. ${row.children.filter(child => child.status === "done").length} de ${row.children.length} completadas`}
               aria-expanded={!!expanded[row.key]}
-              aria-controls={`agenda-children-${row.id}`}
+              aria-controls={`subtasks-${row.id}`}
               onClick={() =>
                 change({
                   expanded: { ...expanded, [row.key]: !expanded[row.key] },
@@ -150,6 +154,7 @@ export default function AgendaView({
               data-edit-key={row.key}
               onClick={() => onEdit(row)}
               title={t.edit}
+              disabled={!!editor?.session}
             >
               {row.title}
             </button>
@@ -157,7 +162,7 @@ export default function AgendaView({
               {row.source === "special_task" ? t.special : t.activity} ·{" "}
               {t[row.type] || row.type}
               {row.children.length > 0 &&
-                ` · ${row.children.filter((child) => child.status === "done").length}/${row.children.length}`}
+                ` · ${row.children.length} ${language === 'en' ? 'subtasks' : 'subtareas'}`}
             </div>
             {row.comment && <p className="agenda-comment">{row.comment}</p>}
           </div>
@@ -196,28 +201,12 @@ export default function AgendaView({
           <span className="agenda-score">
             {priorityScore(row) ?? t.unknown}
           </span>
+          <button type="button" data-delete-key={row.key} disabled={!!editor?.session} onClick={() => onDelete(row)}>{language === 'en' ? 'Delete' : 'Eliminar'}</button>
         </div>
       </article>
+      {editor?.session === row.key && editor.mode === 'inline' && renderEditor()}
       {expanded[row.key] && row.source === "special_task" && (
-        <div className="agenda-children" id={`agenda-children-${row.id}`}>
-          <div role="list">
-            {row.children.map((child) => (
-              <div className="agenda-child" role="listitem" key={child.id}>
-                <strong>↳ {child.title}</strong>
-                <span>{child.ownerLabel || t.unassigned}</span>
-                <span>{child.due_date || t.none}</span>
-                <span className={`agenda-status ${child.status}`}>
-                  {STATUS[language][child.status] || child.status}
-                </span>
-              </div>
-            ))}
-          </div>
-          <button className="agenda-link" onClick={() => onEdit(row)}>
-            {language === "en"
-              ? "Edit subtasks / Add subtask"
-              : "Editar subtareas / Nueva subtarea"}
-          </button>
-        </div>
+        <div className="agenda-children">{renderSubtasks(row)}</div>
       )}
     </div>
   );
@@ -254,9 +243,9 @@ export default function AgendaView({
       {visible.filter((row) => priorityBand(row) === band).map(renderItem)}
     </section>
   );
-  if (source?.loading || source?.error)
+  if ((source?.loading || source?.error) && !rows.length && !editor?.session)
     return (
-      <section className="agenda">
+      <section className="agenda" aria-label="Agenda">
         <h1>Agenda</h1>
         <div
           className="agenda-message"
@@ -276,7 +265,7 @@ export default function AgendaView({
       </section>
     );
   return (
-    <section className="agenda" aria-label="Agenda">
+    <section className="agenda" aria-label="Agenda" data-totals-incomplete={totalsIncomplete || undefined}>
       <div className="agenda-heading">
         <div>
           <h1>Agenda</h1>
@@ -289,18 +278,25 @@ export default function AgendaView({
           {t.new}
         </button>
       </div>
+      {editor?.session && (editor.mode !== 'inline' || !visible.some(row => row.key === editor.session)) && renderEditor()}
+      {editor?.message && !editor.session && <p role="status">{editor.message}</p>}
+      {totalsIncomplete && <p className="agenda-message" role="status">{language === 'en'
+        ? 'Incomplete totals: tasks and subtasks are still loading or unavailable. Counts reflect only loaded records.'
+        : 'Totales incompletos: las tareas y subtareas siguen cargando o no están disponibles. Los contadores solo reflejan los registros cargados.'}</p>}
+      {source?.error && <p role="alert">{source.error}<button onClick={onRetry}>Reintentar</button></p>}
       {state.newMode && (
         <div
           className="agenda-new"
           aria-label={
             language === "en"
-              ? "Create in source editor"
-              : "Crear en editor original"
+              ? "Create in Agenda"
+              : "Crear en Agenda"
           }
         >
           <button
             className="agenda-primary"
             data-action="new-task"
+            disabled={!!editor?.session}
             onClick={onNewTask}
           >
             {language === "en" ? "+ Special task" : "+ Tarea especial"}
@@ -329,7 +325,7 @@ export default function AgendaView({
           <button
             className="agenda-primary"
             data-action="new-activity"
-            disabled={!deals.some((deal) => deal.id === state.newDeal)}
+            disabled={!!editor?.session}
             onClick={() => onNewActivity(state.newDeal)}
           >
             {language === "en"
@@ -444,26 +440,7 @@ export default function AgendaView({
         {t.children} ·{" "}
         {language === "en" ? "Reference date" : "Fecha de referencia"}: {today}
       </p>
-      <div className="agenda-editors">
-        <button
-          className="agenda-link"
-          data-action="legacy-tasks"
-          onClick={() => onLegacy("specialTasks")}
-        >
-          {language === "en"
-            ? "Special tasks · source grid"
-            : "Tareas especiales · cuadrícula original"}
-        </button>
-        <button
-          className="agenda-link"
-          data-action="legacy-activities"
-          onClick={() => onLegacy("activities")}
-        >
-          {language === "en"
-            ? "Activities · original view"
-            : "Actividades · vista original"}
-        </button>
-      </div>
+
     </section>
   );
 }

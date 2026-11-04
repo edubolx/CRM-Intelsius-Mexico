@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {loadJsx,nodes} from './helpers/loadJsx.js';
+import {createAgendaController} from '../src/components/agenda/agendaController.js';
+import {createAgendaRepository,newAgendaDraft} from '../src/components/agenda/agendaRepository.js';
+import {database} from './helpers/agendaDatabase.js';
+
+test('deal context uses the actual shared editor with full links, retains failed drafts, then refreshes exactly its activity', async()=>{
+  const {default:Panel}=await loadJsx('components/activities/ActivitiesPanel.jsx');
+  const {default:Editor}=await loadJsx('components/agenda/AgendaEditor.jsx');
+  const base={...newAgendaDraft('deal_activity','a','d'),title:'Identical',type:'emailType',responsible:'Unknown alias'};
+  const db=database({deal_activities:[base]});
+  let deal={id:'d',name:'Deal',activities:[{id:'a',title:'Identical',nativeRow:base}]};
+  const other={id:'other',name:'Destination'};
+  const c=createAgendaController(createAgendaRepository(db.client),(source,row)=>{assert.equal(source,'deal_activity');deal={...deal,activities:row.deal_id==='d'?[{id:row.id,title:row.title,nativeRow:row}]:[]};});
+  const props=()=>({deal,deals:[deal,other],users:[],agendaController:c,agendaEditor:c.getSnapshot()});
+  let tree=Panel(props()); assert.equal(db.calls.length,0);
+  nodes(tree).find(n=>n.props['data-edit-key']==='deal_activity:a').props.onClick();
+  tree=Panel(props());
+  const shared=nodes(tree).find(n=>n.props.snapshot?.session==='deal_activity:a');
+  assert.ok(shared); const form=Editor(shared.props);
+  assert.match(renderToStaticMarkup(form),/Destination/);
+  nodes(form).find(n=>n.props['aria-label']==='Título').props.onChange({target:{value:'Changed in deal'}});
+  db.fail({before:true}); await c.save();
+  tree=Panel(props()); assert.match(renderToStaticMarkup(tree),/offline/);
+  assert.equal(c.getSnapshot().draft.title,'Changed in deal');
+  await c.save();
+  tree=Panel(props()); assert.match(renderToStaticMarkup(tree),/Changed in deal/);
+  assert.equal(c.getSnapshot().session,null);
+  assert.equal(db.tables.deal_activities[0].type,'emailType');
+});

@@ -118,50 +118,60 @@ test("three views share filters, history uses existing-date meanings and priorit
   assert.match(filtered, /Sin resultados/);
 });
 
-test("nested disclosure and creation route only to existing source writers; load/error hide incomplete totals", async () => {
+test("nested disclosure uses the CAS panel, creation stays in Agenda, and source links are removed", async () => {
   const { default: Agenda } = await component();
-  const expanded = renderToStaticMarkup(
-    React.createElement(Agenda, {
-      ...props,
-      state: { ...props.state, expanded: { "special_task:p": true } },
-    }),
-  );
-  assert.match(expanded, /Nested child/);
-  assert.match(expanded, /aria-expanded="true"/);
-  assert.match(expanded, /Editar subtareas/);
-  let created, activityDeal, legacy;
-  const tree = Agenda({
-    ...props,
-    state: { ...props.state, newMode: true, newDeal: "d" },
-    onNewTask: () => {
-      created = true;
-    },
-    onNewActivity: (id) => {
-      activityDeal = id;
-    },
-    onLegacy: (value) => {
-      legacy = value;
-    },
-  });
-  const all = nodes(tree);
-  all.find((n) => n.props["data-action"] === "new-task").props.onClick();
-  assert.equal(created, true);
-  all.find((n) => n.props["data-action"] === "new-activity").props.onClick();
-  assert.equal(activityDeal, "d");
-  all
-    .find((n) => n.props["data-action"] === "legacy-activities")
-    .props.onClick();
-  assert.equal(legacy, "activities");
-  for (const source of [
-    { loading: true },
-    { loading: false, error: "offline" },
-  ]) {
-    const html = renderToStaticMarkup(
-      React.createElement(Agenda, { ...props, source }),
-    );
-    assert.doesNotMatch(html, /data-agenda-id|agenda-stats|agenda-tabs/);
-    assert.match(html, source.loading ? /role="status"/ : /role="alert"/);
+  let nested, created, activityDeal;
+  const tree=Agenda({...props,state:{...props.state,newMode:true,newDeal:'d',expanded:{'special_task:p':true}},
+    renderSubtasks:row=>{nested=row;return React.createElement('div',{'data-subtask-parent':row.id},row.children[0].title);},
+    onNewTask:()=>{created=true;},onNewActivity:id=>{activityDeal=id;}});
+  const html=renderToStaticMarkup(tree),all=nodes(tree);
+  assert.equal(nested.key,'special_task:p');assert.match(html,/Nested child/);
+  assert.match(html,/aria-expanded="true"/);assert.match(html,/aria-controls="subtasks-p"/);
+  assert.doesNotMatch(html,/legacy-|editor original|cuadrícula original/);
+  all.find(n=>n.props['data-action']==='new-task').props.onClick();assert.equal(created,true);
+  all.find(n=>n.props['data-action']==='new-activity').props.onClick();assert.equal(activityDeal,'d');
+  for(const source of [{loading:true},{error:'offline'}]) {
+    const html=renderToStaticMarkup(React.createElement(Agenda,{...props,rows:[],source}));
+    assert.doesNotMatch(html,/agenda-stats|agenda-tabs/);
+    assert.match(html,source.loading?/role="status"/:/role="alert"/);
   }
+});
+
+test("all views edit/delete exact source keys; inline draft and filters survive changing the visible selection", async()=>{
+  const {default:Agenda}=await component();
+  for(const view of ['pending','priority','history']) {
+    let edited,deleted;
+    const expected=view==='history'?'deal_activity:a':'special_task:p';
+    const tree=Agenda({...props,state:{...props.state,view},onEdit:row=>edited=row.key,onDelete:row=>deleted=row.key});
+    const all=nodes(tree);
+    all.find(n=>n.props['data-edit-key']===expected).props.onClick();
+    all.find(n=>n.props['data-delete-key']===expected).props.onClick();
+    assert.equal(edited,expected);assert.equal(deleted,expected);
+  }
+  const state={view:'priority',filters:{search:'does not match'},expanded:{'special_task:p':true}};
+  const before=structuredClone(state);
+  const tree=Agenda({...props,state,editor:{session:'special_task:p',mode:'inline'},renderEditor:()=>React.createElement('form',{'data-editor-key':'special_task:p'},'Draft retained')});
+  const html=renderToStaticMarkup(tree);
+  assert.match(html,/Draft retained/);assert.deepEqual(state,before);
+});
+
+test("partial sources mark activity-only totals incomplete without hiding rows or drafts", async()=>{
+  const {default:Agenda}=await component();
+  const activityRows=buildAgenda({deals:[{id:'d',activities:[{id:'a',title:'Loaded activity',type:'call',status:'pending'}]}]});
+  for(const source of [{loading:true,error:''},{loading:false,error:'Tasks offline'}]) {
+    for(const view of ['pending','priority','history']) {
+      const html=renderToStaticMarkup(React.createElement(Agenda,{...props,rows:activityRows,source,
+        state:{...props.state,view},editor:{session:'special_task:draft',mode:'inline'},
+        renderEditor:()=>React.createElement('form',{'data-editor-key':'special_task:draft'},'Unsaved draft')}));
+      assert.match(html,/Totales incompletos/);
+      assert.match(html,/data-totals-incomplete="true"/);
+      assert.match(html,/Unsaved draft/);
+      if(view!=='history') assert.match(html,/Loaded activity/);
+      if(source.error) assert.match(html,/Tasks offline/);
+    }
+  }
+  const complete=renderToStaticMarkup(React.createElement(Agenda,{...props,rows:activityRows}));
+  assert.doesNotMatch(complete,/Totales incompletos|data-totals-incomplete="true"/);
 });
 
 test("linked special tasks in deal context are a read-only second view of the same source IDs", async () => {

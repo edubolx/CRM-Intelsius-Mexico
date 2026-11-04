@@ -20,10 +20,9 @@ export default function DealDetailModal({
   t,
   onSaveEval,
   onDeleteEval,
-  onAddActivity,
-  onDeleteActivity,
-  onUpdateActivityStatus,
-  onUpdateActivity,
+  agendaDeals,
+  agendaController,
+  agendaEditor,
   onEditDeal,
   onAddJournalEntry,
   onDeleteJournalEntry,
@@ -102,14 +101,8 @@ export default function DealDetailModal({
         <>
         <ActivitiesPanel
           deal={deal}
-          focusActivityId={focusActivityId}
-          t={t}
-          users={users}
-          onAddActivity={onAddActivity}
-          onDeleteActivity={onDeleteActivity}
-          onUpdateActivityStatus={onUpdateActivityStatus}
-          onUpdateActivity={onUpdateActivity}
-          helpers={{ today, uid, ACTIVITY_TYPES, ACTIVITY_STATUSES, Sel, Inp, Txta, Btn, Ic, iSx }}
+          users={users} lang={lang} deals={agendaDeals}
+          agendaController={agendaController} agendaEditor={agendaEditor}
         />
         <LinkedSpecialTasks rows={linkedTaskRows} dealId={deal.id} lang={lang} source={agendaSource} onEdit={onOpenSpecialTask} onRetry={agendaSource?.retry} />
         </>

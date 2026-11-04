@@ -1,294 +1,151 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import React from "react";
-import { transformWithEsbuild } from "vite";
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import React from 'react';
+import { readFile } from 'node:fs/promises';
+import { transformWithEsbuild } from 'vite';
+import {createAgendaController} from '../src/components/agenda/agendaController.js';
+import {newAgendaDraft} from '../src/components/agenda/agendaRepository.js';
+import {createAgendaSources} from '../src/components/agenda/agendaSources.js';
+import {buildAgenda} from '../src/components/agenda/agendaModel.js';
+import {loadJsx} from './helpers/loadJsx.js';
+import {renderToStaticMarkup} from 'react-dom/server';
 
-// Minimal deterministic hook host: exercises real effects/handlers without DOM or network.
-// It is not a substitute for the separate browser QA.
-const hostKey = "__agendaLifecycleTest";
-const hookModule = `const host = () => globalThis.${hostKey};
-export const Fragment = Symbol.for('react.fragment');
-export function useState(initial) { const h=host(), i=h.index++; if (!(i in h.values)) h.values[i]=typeof initial==='function'?initial():initial; return [h.values[i], next=>{h.values[i]=typeof next==='function'?next(h.values[i]):next;}]; }
-export function useRef(initial) { return useState(()=>({current:initial}))[0]; }
-export function useMemo(fn) { host().index++; return fn(); }
-export function useSyncExternalStore(subscribe,get) { host().index++; return get(); }
-export function useEffect(fn,deps) { const h=host(),i=h.index++,old=h.deps[i]; if (!old || !deps || deps.some((v,j)=>v!==old[j])) {h.pending.push(()=>{h.cleanups[i]?.();h.cleanups[i]=fn();});h.deps[i]=deps;} }
-`;
-const hookURL = `data:text/javascript;base64,${Buffer.from(hookModule).toString("base64")}`;
-let moduleSequence = 0;
-async function loadComponent(relative, client) {
-  const url = new URL(`../src/${relative}`, import.meta.url);
-  let source = await readFile(url, "utf8");
-  source = source.replace(/import React from ['"]react['"];?/g, "");
-  source = source.replace(/from ['"]react['"]/g, `from '${hookURL}'`);
-  source = source.replace(
-    /import \{ supabase \} from ['"][^'"]+['"];?/,
-    `const supabase = globalThis.${hostKey}.client;`,
-  );
-  for (const match of [...source.matchAll(/from ['"]([^'"]+\.jsx)['"]/g)]) {
-    const child = await loadComponent(
-      new URL(match[1], url).pathname.split("/src/")[1],
-      client,
-    );
-    source = source.replace(match[0], `from '${child}'`);
-  }
-  source = source.replace(
-    /from ['"]([^'"]+\.js)['"]/g,
-    (_, path) => `from '${new URL(path, url).href}'`,
-  );
-  const { code } = await transformWithEsbuild(source, relative, {
-    loader: "jsx",
-    jsxFactory: "React.createElement",
-    jsxFragment: "React.Fragment",
-  });
-  return `data:text/javascript;base64,${Buffer.from(`import React from '${import.meta.resolve("react")}';\n${code}\n// test module ${++moduleSequence}`).toString("base64")}`;
-}
-const nodes = (tree) => {
-  const all = [];
-  function visit(el) {
-    if (!React.isValidElement(el)) return;
-    all.push(el);
-    React.Children.forEach(el.props.children, visit);
-  }
-  visit(tree);
-  return all;
-};
-function host(client) {
-  const h = {
-    client,
-    index: 0,
-    values: [],
-    deps: [],
-    cleanups: [],
-    pending: [],
-    render(Component, props) {
-      h.index = 0;
-      h.pending = [];
-      const tree = Component(props);
-      for (const effect of h.pending) effect();
-      return tree;
-    },
-    stop() {
-      for (const fn of h.cleanups) fn?.();
-    },
-  };
-  globalThis[hostKey] = h;
-  return h;
-}
-const tick = () => new Promise((resolve) => setImmediate(resolve));
-function fakeClient() {
-  const writes = [],
-    reads = [],
-    removed = [];
-  const tables = {
-    special_tasks: [
-      { id: "one", title: "Identical", status: "waiting" },
-      { id: "two", title: "Identical", status: "notStarted" },
-    ],
-    special_task_subtasks: [],
-  };
-  const client = {
-    from(table) {
-      const query = {
-        select() {
-          reads.push(table);
-          return query;
-        },
-        order() {
-          return query;
-        },
-        then(resolve) {
-          return Promise.resolve({ data: tables[table], error: null }).then(
-            resolve,
-          );
-        },
-        upsert() {
-          writes.push(table);
-          throw Error("Unexpected write");
-        },
-      };
-      return query;
-    },
-    channel() {
-      const c = {
-        on() {
-          return c;
-        },
-        subscribe() {
-          return c;
-        },
-      };
-      return c;
-    },
-    removeChannel(c) {
-      removed.push(c);
-    },
-  };
-  return { client, reads, writes, removed };
-}
-test("exact-ID legacy task navigation highlights/scrolls only that record, and opening/closing writes nothing", async () => {
-  const fixture = fakeClient(),
-    h = host(fixture.client),
-    scrolls = [],
-    focuses = [];
-  const previous = globalThis.document;
-  globalThis.document = {
-    getElementById(id) {
-      return {
-        scrollIntoView() {
-          scrolls.push(id);
-        },
-        focus() {
-          focuses.push(id);
-        },
-      };
-    },
-  };
-  try {
-    const { default: Tasks } = await import(
-      await loadComponent(
-        "components/special-tasks/SpecialTasksView.jsx",
-        fixture.client,
-      )
-    );
-    const props = {
-      users: [],
-      deals: [],
-      search: "does not match",
-      lang: "en",
-      focusTaskId: "two",
-    };
-    h.render(Tasks, props);
-    await tick();
-    const tree = h.render(Tasks, props);
-    assert.deepEqual(
-      nodes(tree)
-        .filter((n) => n.props["data-special-task-id"])
-        .map((n) => n.props["data-special-task-id"]),
-      ["two"],
-    );
-    assert.ok(nodes(tree).some(node => node.type === "button" && node.props.children === "Show all"));
-    assert.deepEqual(scrolls, ["special-task-two"]);
-    assert.deepEqual(focuses, []);
-    h.stop();
-    assert.deepEqual(fixture.writes, []);
-    assert.equal(fixture.removed.length, 2);
-  } finally {
-    globalThis.document = previous;
-    delete globalThis[hostKey];
-  }
+test('accept after a failed initial collection read retains the error and actual Agenda incomplete warning', async()=>{
+  let reads=0;
+  let offline=true;
+  const saved={id:'same',title:'Confirmed task',status:'notStarted'};
+  const store=createAgendaSources({from(){return {select(){return this;},order(){
+    reads++;
+    return Promise.resolve(offline?{error:Error('Tasks offline')}:{data:[]});
+  }};}});
+  await store.load();
+  assert.equal(store.getSnapshot().error,'Tasks offline');
+  store.accept(saved);
+  assert.equal(store.getSnapshot().error,'Tasks offline');
+  assert.equal(store.getSnapshot().loading,false);
+  assert.deepEqual(store.getSnapshot().tasks,[saved]);
+  const {default:Agenda}=await loadJsx('components/agenda/AgendaView.jsx');
+  const source=store.getSnapshot();
+  const rows=buildAgenda({...source,deals:[{id:'d',activities:[{id:'same',title:'Loaded activity',type:'call',status:'pending'}]}]});
+  const html=renderToStaticMarkup(React.createElement(Agenda,{rows,source,today:'2026-11-04',state:{view:'pending',filters:{},expanded:{}},onStateChange(){}}));
+  assert.match(html,/Totales incompletos/);
+  assert.match(html,/data-totals-incomplete="true"/);
+  assert.match(html,/Tasks offline/);
+  assert.match(html,/special_task:same/);
+  assert.match(html,/deal_activity:same/);
+  assert.match(html,/Confirmed task/);
+  assert.match(html,/Loaded activity/);
+  assert.equal(reads,2,'accept and render must not trigger reads');
+  offline=false;
+  await store.load();
+  assert.equal(store.getSnapshot().error,'');
+  assert.equal(store.getSnapshot().loading,false);
+});
+test('pending initial full read merges unrelated rows with the latest accepted edit and new record', async()=>{
+  const pending=[];
+  const store=createAgendaSources({from(table){return {select(){return this;},order(){
+    return new Promise(resolve=>pending.push({table,resolve}));
+  }};}});
+  const load=store.load();
+  const latest={id:'same',title:'Latest confirmed edit',status:'waiting'};
+  const created={id:'created',title:'Confirmed new row'};
+  const other={id:'other',title:'Unrelated collection row'};
+  const child={id:'child',parent_task_id:'other'};
+  store.accept({...latest,title:'Earlier confirmed edit'});
+  store.accept(latest);
+  store.accept(created);
+  assert.equal(store.getSnapshot().loading,true,'one confirmed row does not complete the collection');
+  assert.equal(pending.length,2,'accept must not launch another bulk read');
+  pending.find(p=>p.table==='special_tasks').resolve({data:[{...latest,title:'Stale full-read title'},other]});
+  pending.find(p=>p.table==='special_task_subtasks').resolve({data:[child]});
+  await load;
+  const source=store.getSnapshot();
+  assert.deepEqual([...source.tasks].sort((a,b)=>a.id.localeCompare(b.id)),[created,other,latest].sort((a,b)=>a.id.localeCompare(b.id)));
+  assert.deepEqual(source.children,[child]);
+  assert.equal(source.loading,false);
+  assert.equal(source.error,'');
+  const {default:Agenda}=await loadJsx('components/agenda/AgendaView.jsx');
+  const html=renderToStaticMarkup(React.createElement(Agenda,{rows:buildAgenda(source),source,today:'2026-11-04',state:{view:'pending',filters:{},expanded:{}},onStateChange(){}}));
+  assert.doesNotMatch(html,/Totales incompletos|data-totals-incomplete="true"|Stale full-read title/);
+  assert.match(html,/Unrelated collection row/);
+  assert.match(html,/Latest confirmed edit/);
+  assert.equal(pending.length,2);
 });
 
-test("new-task route creates only an unsaved blank local row until the existing editor is used", async () => {
-  const fixture = fakeClient(),
-    h = host(fixture.client);
-  try {
-    const { default: Tasks } = await import(
-      await loadComponent(
-        "components/special-tasks/SpecialTasksView.jsx",
-        fixture.client,
-      )
-    );
-    const props = { users: [], deals: [], createOnOpen: true };
-    h.render(Tasks, props);
-    // React StrictMode replays mount effects before either bulk read settles.
-    h.stop();
-    h.cleanups = [];
-    h.deps = [];
-    h.render(Tasks, props);
-    await tick();
-    const tree = h.render(Tasks, props);
-    assert.equal(
-      nodes(tree).filter((n) => n.props["data-special-task-id"]).length,
-      3,
-    );
-    assert.deepEqual(fixture.writes, []);
-    h.stop();
-  } finally {
-    delete globalThis[hostKey];
-  }
+test('pending initial full read cannot resurrect a confirmed deletion or its children', async()=>{
+  const pending=[];
+  const store=createAgendaSources({from(table){return {select(){return this;},order(){
+    return new Promise(resolve=>pending.push({table,resolve}));
+  }};}});
+  const load=store.load();
+  const deleted={id:'deleted',title:'Same title'};
+  const other={id:'other',title:'Same title'};
+  const keptChild={id:'kept-child',parent_task_id:'other'};
+  store.accept(deleted);
+  store.accept(deleted,true);
+  assert.deepEqual(store.getSnapshot().tasks,[]);
+  assert.equal(store.getSnapshot().loading,true);
+  pending.find(p=>p.table==='special_tasks').resolve({data:[deleted,other]});
+  pending.find(p=>p.table==='special_task_subtasks').resolve({data:[{id:'deleted-child',parent_task_id:'deleted'},keptChild]});
+  await load;
+  assert.deepEqual(store.getSnapshot(),{tasks:[other],children:[keptChild],loading:false,error:''});
+  // A later complete read is authoritative, not permanently shadowed by tombstones.
+  const next=store.load();
+  pending[2].resolve({data:[{...deleted,title:'Recreated later'},other]});
+  pending[3].resolve({data:[keptChild]});
+  await next;
+  assert.deepEqual(store.getSnapshot().tasks,[{...deleted,title:'Recreated later'},other]);
+  assert.equal(pending.length,4);
 });
 
-test("exact-ID activity route fills the existing form once, preserves native type/null due date, and retains a draft across refresh", async () => {
-  const h = host(null),
-    writes = [];
-  try {
-    const { default: Activities } = await import(
-      await loadComponent("components/activities/ActivitiesPanel.jsx")
-    );
-    const helpers = {
-      today: () => "2026-11-02",
-      uid: () => "new",
-      ACTIVITY_TYPES: ["emailType", "task"],
-      ACTIVITY_STATUSES: ["pending", "done"],
-      Sel: () => null,
-      Inp: () => null,
-      Txta: () => null,
-      Btn: () => null,
-      Ic: () => null,
-      iSx: {},
-    };
-    const props = {
-      deal: {
-        activities: [
-          { id: "a", title: "Identical", type: "task" },
-          {
-            id: "b",
-            title: "Identical",
-            type: "emailType",
-            dueDate: null,
-            status: "done",
-          },
-        ],
-      },
-      focusActivityId: "b",
-      t: {
-        activityTitle: "Title",
-        activityDueDate: "Due",
-        activityType: "Type",
-      },
-      users: [],
-      helpers,
-      onUpdateActivity: () => writes.push("update"),
-      onAddActivity: () => writes.push("add"),
-    };
-    h.render(Activities, props);
-    let tree = h.render(Activities, props),
-      all = nodes(tree);
-    assert.equal(
-      all.find((n) => n.props.label === "Type").props.value,
-      "emailType",
-    );
-    assert.equal(all.find((n) => n.props.label === "Due").props.value, "");
-    all
-      .find((n) => n.props.label === "Title *")
-      .props.onChange({ target: { value: "Retained draft" } });
-    tree = h.render(Activities, {
-      ...props,
-      deal: { activities: [...props.deal.activities] },
-    });
-    assert.equal(
-      nodes(tree).find((n) => n.props.label === "Title *").props.value,
-      "Retained draft",
-    );
-    assert.deepEqual(writes, []);
-    h.stop();
-    const nativeHost = host(null);
-    const nativeProps = {
-      ...props,
-      deal: { activities: [{ ...props.deal.activities[1], type: "email" }] },
-    };
-    nativeHost.render(Activities, nativeProps);
-    const nativeTree = nativeHost.render(Activities, nativeProps);
-    const typeField = nodes(nativeTree).find((n) => n.props.label === "Type");
-    assert.equal(typeField.props.value, "email");
-    assert.ok(
-      typeField.props.opts.some((option) => option.v === "email"),
-      "native email must remain a visible option",
-    );
-    nativeHost.stop();
-  } finally {
-    delete globalThis[hostKey];
-  }
+async function component(name) {
+  const url=new URL(`../src/components/agenda/${name}.jsx`,import.meta.url);
+  let source=await readFile(url,'utf8');
+  source=source.replace(/from ['"]([^'"]+\.js)['"]/g,(_,p)=>`from '${new URL(p,url).href}'`);
+  const {code}=await transformWithEsbuild(source,name+'.jsx',{loader:'jsx',jsxFactory:'React.createElement',jsxFragment:'React.Fragment'});
+  return (await import(`data:text/javascript;base64,${Buffer.from(`import React from '${import.meta.resolve('react')}';\n${code}`).toString('base64')}`)).default;
+}
+const nodes = tree => {const all=[];function visit(el){if(!React.isValidElement(el))return;all.push(el);React.Children.forEach(el.props.children,visit);} visit(tree);return all;};
+
+test('shared editor and nested CAS rows provide responsive layout and keyboard focus styles', async()=>{
+  const css=await readFile(new URL('../src/components/agenda/agenda.css',import.meta.url),'utf8');
+  assert.match(css,/\.agenda-editor-fields\s*\{/);
+  assert.match(css,/\.agenda-editor[^}]*:focus-visible|\.agenda-editor\s+:is\([^)]*\):focus-visible/);
+  assert.match(css,/@media[^}]+max-width:\s*600px[\s\S]*\.agenda-subtasks/);
+});
+
+test('delete dialog identifies the native activity type, exact source ID and title and cancels locally', async()=>{
+  const c=createAgendaController({remove:async()=>assert.fail('Cancel must not write')});
+  const Editor=await component('AgendaEditor');
+  const base={...newAgendaDraft('deal_activity','same','d'),type:'emailType',title:'Duplicate title'};
+  c.open({source:'deal_activity',id:'same',base,mode:'delete'});
+  const tree=Editor({snapshot:c.getSnapshot(),controller:c});
+  const {renderToStaticMarkup}=await import('react-dom/server');
+  const html=renderToStaticMarkup(tree);
+  assert.match(html,/emailType/);assert.match(html,/deal_activity:same/);assert.match(html,/Duplicate title/);
+  nodes(tree).find(n=>n.props['data-action']==='cancel-editor').props.onClick();
+  assert.equal(c.getSnapshot().session,null);
+});
+
+test('shared editor preserves native values and drafts; open/cancel/type never write', async()=>{
+  const writes=[];
+  const c=createAgendaController({save:async attempt=>{writes.push(attempt);throw Error('offline');}});
+  const Editor=await component('AgendaEditor');
+  const base={...newAgendaDraft('deal_activity','b','d'),title:'Identical',type:'email',responsible:'Edu-USA',due_date:null};
+  c.open({source:'deal_activity',id:'b',base});
+  const props=()=>({snapshot:c.getSnapshot(),controller:c,users:[],deals:[{id:'d',name:'Deal'}]});
+  let all=nodes(Editor(props()));
+  assert.equal(all.find(n=>n.props['aria-label']==='Tipo').props.value,'email');
+  assert.equal(all.find(n=>n.props['aria-label']==='Responsable').props.value,'Edu-USA');
+  assert.equal(all.find(n=>n.props['aria-label']==='Fecha compromiso').props.value,'');
+  all.find(n=>n.props['aria-label']==='Título').props.onChange({target:{value:'Retained draft'}});
+  assert.equal(writes.length,0);
+  all=nodes(Editor(props()));
+  await all.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
+  assert.equal(c.getSnapshot().draft.title,'Retained draft');
+  assert.equal(c.getSnapshot().session,'deal_activity:b');
+  assert.match(c.getSnapshot().error,/offline/);
+  all=nodes(Editor(props())); assert.ok(all.some(n=>n.props.role==='alert'));
+  all.find(n=>n.props['data-action']==='cancel-editor').props.onClick();
+  assert.equal(writes.length,1); assert.equal(c.getSnapshot().session,null);
 });

@@ -1,4 +1,10 @@
-// Read-only projection. Native IDs and values remain owned by their source editor.
+// Source-qualified projection; editing always uses the untouched native row.
+export function persistedAgendaChildren(rows) {
+  return rows.filter(child => !child.isNew).map(child => {
+    const base=child.baseValues || child;
+    return {id:child.id,parent_task_id:child.parentTaskId,title:base.title,owner_id:base.ownerId || null,status:base.status,due_date:base.dueDate || null};
+  });
+}
 export function buildAgenda({
   tasks = [],
   children = [],
@@ -30,6 +36,7 @@ export function buildAgenda({
   const parents = tasks.map((task) => ({
     key: `special_task:${task.id}`,
     source: "special_task",
+    nativeRow: task,
     id: task.id,
     title: task.title || "",
     description: task.description || "",
@@ -55,6 +62,7 @@ export function buildAgenda({
     (deal.activities || []).map((activity) => ({
       key: `deal_activity:${activity.id}`,
       source: "deal_activity",
+      nativeRow: activity.nativeRow || {id:activity.id, deal_id:deal.id, title:activity.title, type:activity.type, status:activity.status, responsible:activity.responsible ?? null, due_date:activity.dueDate ?? null, comment:activity.comment ?? null, importance_score:activity.importanceScore ?? null, urgency_score:activity.urgencyScore ?? null},
       id: activity.id,
       title: activity.title || "",
       description: "",
