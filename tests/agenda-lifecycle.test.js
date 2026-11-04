@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { readFile } from 'node:fs/promises';
-import { transformWithEsbuild } from 'vite';
 import {createAgendaController} from '../src/components/agenda/agendaController.js';
 import {newAgendaDraft} from '../src/components/agenda/agendaRepository.js';
 import {createAgendaSources} from '../src/components/agenda/agendaSources.js';
@@ -99,11 +98,8 @@ test('pending initial full read cannot resurrect a confirmed deletion or its chi
 });
 
 async function component(name) {
-  const url=new URL(`../src/components/agenda/${name}.jsx`,import.meta.url);
-  let source=await readFile(url,'utf8');
-  source=source.replace(/from ['"]([^'"]+\.js)['"]/g,(_,p)=>`from '${new URL(p,url).href}'`);
-  const {code}=await transformWithEsbuild(source,name+'.jsx',{loader:'jsx',jsxFactory:'React.createElement',jsxFragment:'React.Fragment'});
-  return (await import(`data:text/javascript;base64,${Buffer.from(`import React from '${import.meta.resolve('react')}';\n${code}`).toString('base64')}`)).default;
+  // Use the shared recursive JSX loader now that the editor has a presentation import.
+  return (await loadJsx(`components/agenda/${name}.jsx`)).default;
 }
 const nodes = tree => {const all=[];function visit(el){if(!React.isValidElement(el))return;all.push(el);React.Children.forEach(el.props.children,visit);} visit(tree);return all;};
 

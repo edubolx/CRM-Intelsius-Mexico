@@ -2,7 +2,8 @@ import { fieldsFor, newAgendaDraft } from './agendaRepository.js';
 
 // One explicit session for both Agenda and deal context. Render/close never writes.
 export function createAgendaController(repository, onPersist = () => {}) {
-  let snapshot = {session:null, busy:false, error:'', message:''};
+  let snapshot = {session:null, sessionToken:0, busy:false, error:'', message:''};
+  let generation = 0;
   let flight;
   const listeners = new Set();
   const emit = patch => { snapshot={...snapshot,...patch}; listeners.forEach(fn=>fn()); };
@@ -11,7 +12,7 @@ export function createAgendaController(repository, onPersist = () => {}) {
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     open({source,id,base=null,context='agenda',mode='details',dealId='',childCount=0}) {
       if (snapshot.session) return false;
-      emit({session:`${source}:${id}`,source,id,context,mode,base,draft:base ? {...base} : newAgendaDraft(source,id,dealId),childCount,busy:false,error:'',message:'',conflict:null});
+      emit({session:`${source}:${id}`,sessionToken:++generation,source,id,context,mode,base,draft:base ? {...base} : newAgendaDraft(source,id,dealId),childCount,busy:false,error:'',message:'',conflict:null});
       return true;
     },
     edit(patch) {

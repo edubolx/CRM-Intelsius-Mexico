@@ -101,7 +101,8 @@ export default function DealDetailModal({
         <>
         <ActivitiesPanel
           deal={deal}
-          users={users} lang={lang} deals={agendaDeals}
+          users={users} lang={lang} deals={agendaDeals} t={t}
+          helpers={{ today, ACTIVITY_TYPES, ACTIVITY_STATUSES, Sel, Inp, Txta, Btn, Ic, iSx }}
           agendaController={agendaController} agendaEditor={agendaEditor}
         />
         <LinkedSpecialTasks rows={linkedTaskRows} dealId={deal.id} lang={lang} source={agendaSource} onEdit={onOpenSpecialTask} onRetry={agendaSource?.retry} />

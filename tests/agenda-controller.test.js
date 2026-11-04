@@ -4,6 +4,25 @@ import { createAgendaController } from '../src/components/agenda/agendaControlle
 import { createAgendaRepository, newAgendaDraft } from '../src/components/agenda/agendaRepository.js';
 import { database } from './helpers/agendaDatabase.js';
 
+test('each successful open gets a new session token even for the same source ID and context',()=>{
+  const c=createAgendaController({});
+  const open={source:'deal_activity',id:'same',context:'deal:d'};
+  assert.equal(c.open(open),true);
+  const first=c.getSnapshot().sessionToken;
+  assert.notEqual(first,undefined);
+  assert.equal(c.open(open),false);
+  assert.equal(c.getSnapshot().sessionToken,first,'rejected open does not replace the token');
+  c.edit({title:'Local'});
+  assert.equal(c.getSnapshot().sessionToken,first,'edits retain the token');
+  c.cancel();
+  assert.equal(c.open(open),true);
+  const second=c.getSnapshot().sessionToken;
+  assert.notEqual(second,first,'same-ID reopen must not reuse the token');
+  c.cancel();
+  assert.equal(c.open({...open,context:'agenda'}),true);
+  assert.notEqual(c.getSnapshot().sessionToken,second);
+});
+
 test('conflicts retain intention until explicit retry; delete confirmation/cancel are local and delete errors retain selection', async () => {
   const base={...newAgendaDraft('special_task','p'),title:'Base',comments:'Original'};
   const db=database({special_tasks:[base]}),changes=[];

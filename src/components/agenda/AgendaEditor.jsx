@@ -1,9 +1,10 @@
 import { TASK_STATES, ACTIVITY_STATES, ACTIVITY_TYPES } from './agendaRepository.js';
 import { AGENDA_STATUS } from './agendaLabels.js';
+import { renderDealActivityForm } from './DealActivityForm.jsx';
 
 // Pure form: all changes are local to the shared controller until explicit Save.
-export default function AgendaEditor({snapshot:s,controller,users=[],deals=[],lang='es'}) {
-  if (!s?.session) return null;
+export default function AgendaEditor({snapshot:s,controller,users=[],deals=[],lang='es',presentation,t,helpers}) {
+  if (!s?.session && presentation!=='deal') return null;
   const task=s.source==='special_task', d=s.draft, details=s.mode!=='inline';
   const change=(key,value)=>controller.edit({[key]:value});
   const input=(key,label,type='text')=><label><span>{label}</span><input aria-label={label} type={type} value={d[key] ?? ''} required={key==='title'} onChange={e=>change(key,e.target.value || (type==='date'?null:''))} /></label>;
@@ -13,6 +14,7 @@ export default function AgendaEditor({snapshot:s,controller,users=[],deals=[],la
     return <label><span>{label}</span><select aria-label={label} value={d[key] ?? ''} onChange={e=>change(key,e.target.value || null)}>{all.map(([value,name])=><option key={value} value={value}>{name}</option>)}</select></label>;
   };
   const error=s.error && <div role="alert">{s.error}{s.conflict && <><p>Valores actuales del servidor:</p><ul>{s.conflict.dirty.map(key=><li key={key}>{key}: {String(s.conflict.remote[key] ?? '—')}</li>)}</ul></>}</div>;
+  if(presentation==='deal' && !task && s.mode!=='delete') return renderDealActivityForm({snapshot:s,controller,users,deals,lang,t,helpers,error});
   const cancel=<button type="button" data-action="cancel-editor" disabled={s.busy} onClick={()=>controller.cancel()}>Cancelar</button>;
   if(s.mode==='delete') return <section className="agenda-editor" data-editor-key={s.session} data-editor-mode="delete" role="alertdialog" aria-label="Confirmar eliminación">
     <h2>Eliminar {task?'tarea especial':'actividad'}: {d.title}</h2>
